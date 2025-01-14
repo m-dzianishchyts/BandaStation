@@ -10,7 +10,7 @@
 
 /datum/hud/new_player/New(mob/owner)
 	. = ..()
-
+	/* BANDASTATION REMOVAL - HTML Title Screen
 	if (!owner || !owner.client)
 		return
 
@@ -614,6 +614,7 @@
 
 	//pull the shutter back off-screen
 	animate(transform = matrix(), time = SHUTTER_MOVEMENT_DURATION, easing = CUBIC_EASING|EASE_IN)
+*/
 
 /// LOCALHOST ONLY - Start Now button
 /atom/movable/screen/lobby/button/start_now
