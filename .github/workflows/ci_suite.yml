@@ -163,6 +163,7 @@ jobs:
     name: Collect data and setup caches for other tasks
     needs: start_gate
     runs-on: ubuntu-22.04
+    environment: Integration Testing
     timeout-minutes: 5
     outputs:
       maps: ${{ steps.map_finder.outputs.maps }}
