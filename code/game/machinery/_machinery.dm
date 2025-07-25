@@ -1040,6 +1040,12 @@
 
 	var/obj/item/circuitboard/machine/machine_board = locate(/obj/item/circuitboard/machine) in component_parts
 	if(works_from_distance)
+		// BANDASTATION EDIT START - no more part replacement through a camera
+		if(!(src in view(user.client.view, user)))
+			to_chat(user, span_warning("[capitalize(src.declent_ru(NOMINATIVE)))] вне видимости!"))
+			return FALSE
+		// BANDASTATION EDIT END
+
 		to_chat(user, display_parts(user))
 	if(!machine_board)
 		return FALSE
