@@ -94,20 +94,23 @@ const PollCard = ({
   const { act } = useBackend<Data>();
   const isArchived = !!poll.finished;
   const baseBackground = isArchived
-    ? 'hsla(0, 22%, 16%, 0.62)'
+    ? 'hsla(220, 6%, 20%, 0.58)'
     : active
       ? 'hsla(210, 34%, 16%, 0.72)'
       : 'hsla(220, 22%, 12%, 0.62)';
   const borderColor = isArchived
-    ? 'hsla(0, 70%, 52%, 0.72)'
+    ? 'hsla(220, 8%, 52%, 0.6)'
     : active
       ? 'hsla(205, 90%, 68%, 0.78)'
       : 'hsla(220, 24%, 34%, 0.5)';
   const glow = active
     ? 'inset 0 0 0 1px hsla(205, 95%, 75%, 0.42), 0 0 8px hsla(205, 95%, 65%, 0.2)'
     : isArchived
-      ? 'inset 0 0 0 1px hsla(0, 80%, 60%, 0.26)'
+      ? 'inset 0 0 0 1px hsla(220, 8%, 66%, 0.22)'
       : 'none';
+  const titleOpacity = isArchived ? 0.78 : 1;
+  const metaOpacity = isArchived ? 0.62 : 0.88;
+  const iconOpacity = isArchived ? 0.72 : 1;
 
   return (
     <Button
@@ -136,7 +139,7 @@ const PollCard = ({
       }}
     >
       <Stack align="center" g={0.75}>
-        <Stack.Item width="1.75rem" textAlign="center" color="label">
+        <Stack.Item width="1.75rem" textAlign="center" color="label" style={{ opacity: iconOpacity }}>
           <Tooltip content={POLL_TYPE_LABELS[poll.poll_type]}>
             <Icon name={POLL_TYPE_ICONS[poll.poll_type]} />
           </Tooltip>
@@ -146,7 +149,7 @@ const PollCard = ({
             <Stack.Item>
               <Stack align="center">
                 <Stack.Item grow>
-                  <Box bold style={{ overflowWrap: 'anywhere' }}>
+                  <Box bold style={{ overflowWrap: 'anywhere', opacity: titleOpacity }}>
                     {poll.question}
                   </Box>
                 </Stack.Item>
@@ -178,7 +181,7 @@ const PollCard = ({
               </Stack>
             </Stack.Item>
             <Stack.Item>
-              <Box color="label" fontSize={0.88} opacity={0.88}>
+              <Box color="label" fontSize={0.88} opacity={metaOpacity}>
                 <Icon name="users" /> {poll.total_votes}
                 {' | '}
                 <Icon name="calendar-day" />{' '}
