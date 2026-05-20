@@ -305,11 +305,6 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 			while(query.NextRow())
 				picked += text2num(query.item[2])
 			result["option_ids"] = picked
-		if(POLLTYPE_IRV)
-			var/list/ranking = list()
-			while(query.NextRow())
-				ranking += text2num(query.item[2])
-			result["ranking"] = ranking
 
 	qdel(query)
 	return result

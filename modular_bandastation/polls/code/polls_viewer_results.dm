@@ -15,7 +15,10 @@
 		if(POLLTYPE_TEXT)
 			return tally_text_poll(poll)
 		if(POLLTYPE_IRV)
-			return tally_irv_poll(poll)
+			return list(
+				"type" = POLLTYPE_IRV,
+				"note" = "Этот тип опроса не поддерживается.",
+			)
 	return null
 
 /**
@@ -188,56 +191,6 @@
 		))
 	qdel(query)
 
-	return result
-
-/**
- * IRV: упрощённый подсчёт первых предпочтений.
- * Полноценный Condorcet/IRV алгоритм лежит на Statbus — здесь показываем первый выбор каждого голосующего.
- */
-/datum/polls_viewer/proc/tally_irv_poll(datum/poll_question/poll)
-	var/list/result = list(
-		"type" = POLLTYPE_IRV,
-		"total_voters" = 0,
-		"options" = list(),
-		"note" = "Первый выбор каждого голосующего. Финальный результат рассчитывается внешним сервисом (Statbus).",
-	)
-
-	var/list/counts = list()
-	for(var/datum/poll_option/option as anything in poll.options)
-		counts["[option.option_id]"] = list(
-			"option_id" = option.option_id,
-			"text" = option.text,
-			"votes" = 0,
-		)
-
-	// Берём минимальный id (первое предпочтение) для каждого ckey
-	var/datum/db_query/query = SSdbcore.NewQuery({"
-		SELECT optionid, COUNT(*) FROM (
-			SELECT ckey, MIN(id) AS first_vote
-			FROM [format_table_name("poll_vote")]
-			WHERE pollid = :poll_id AND deleted = 0
-			GROUP BY ckey
-		) AS firsts
-		JOIN [format_table_name("poll_vote")] AS pv ON pv.id = firsts.first_vote
-		GROUP BY pv.optionid
-	"}, list("poll_id" = poll.poll_id))
-	if(!query.warn_execute())
-		qdel(query)
-		return result
-
-	var/total = 0
-	while(query.NextRow())
-		var/option_id_key = "[query.item[1]]"
-		var/vote_count = text2num(query.item[2])
-		if(counts[option_id_key])
-			counts[option_id_key]["votes"] = vote_count
-		total += vote_count
-	qdel(query)
-
-	result["total_voters"] = total
-	for(var/key in counts)
-		result["options"] += list(counts[key])
-	sortTim(result["options"], GLOBAL_PROC_REF(cmp_poll_result_votes_desc))
 	return result
 
 /// Сравнение для сортировки опций по убыванию голосов.

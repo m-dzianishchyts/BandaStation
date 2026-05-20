@@ -102,8 +102,13 @@
 			<option value='[POLLTYPE_OPTION]'[poll?.poll_type == POLLTYPE_OPTION ? " selected" : ""]>Single Option</option>
 			<option value='[POLLTYPE_TEXT]'[poll?.poll_type == POLLTYPE_TEXT ? " selected" : ""]>Text Reply</option>
 			<option value='[POLLTYPE_RATING]'[poll?.poll_type == POLLTYPE_RATING ? " selected" : ""]>Rating</option>
-			<option value='[POLLTYPE_MULTI]'[poll?.poll_type == POLLTYPE_MULTI ? " selected" : ""]>Multiple Choice</option>
-			<option value='[POLLTYPE_IRV]'[poll?.poll_type == POLLTYPE_IRV ? " selected" : ""]>Instant Runoff</option>
+			<option value='[POLLTYPE_MULTI]'[poll?.poll_type == POLLTYPE_MULTI ? " selected" : ""]>Multiple Choice</option>"}
+// BANDASTATION MOD START: Deprecate POLLTYPE_IRV
+	if(poll?.poll_type == POLLTYPE_IRV)
+		output += {"
+			<option value='[POLLTYPE_IRV]' selected>Instant Runoff</option>"}
+// BANDASTATION MOD END
+	output += {"
 		</select>
 	</div>
 	Question

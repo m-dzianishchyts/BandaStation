@@ -109,10 +109,4 @@
 					continue
 				href_list[option_ref] = TRUE
 
-		if(POLLTYPE_IRV)
-			var/list/ranking = params["ranking"]
-			if(!islist(ranking) || !length(ranking))
-				return
-			href_list["IRVdata"] = ranking.Join(",")
-
 	new_player.vote_on_poll_handler(poll, href_list)
