@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import {
   Box,
   Button,
@@ -11,7 +12,7 @@ import {
 import { useBackend } from '../../backend';
 import type { Data, PollBrief, PollType } from './types';
 
-const POLL_TYPE_LABELS: Record<PollType, string> = {
+const pollTypeLabels: Record<PollType, string> = {
   OPTION: 'Один вариант',
   TEXT: 'Текстовый ответ',
   NUMVAL: 'Рейтинг',
@@ -19,7 +20,7 @@ const POLL_TYPE_LABELS: Record<PollType, string> = {
   IRV: 'Ранжирование',
 };
 
-const POLL_TYPE_ICONS: Record<PollType, string> = {
+const pollTypeIcons: Record<PollType, string> = {
   OPTION: 'list-ul',
   TEXT: 'pen',
   NUMVAL: 'star',
@@ -27,13 +28,29 @@ const POLL_TYPE_ICONS: Record<PollType, string> = {
   IRV: 'sort',
 };
 
+const uiLockedGreystyle: CSSProperties = {
+  opacity: 0.52,
+  filter: 'grayscale(0.38)',
+  cursor: 'not-allowed',
+  pointerEvents: 'none',
+};
+
+const POLL_TITLE_IDLE_COLOR = 'hsla(218, 12%, 66%, 0.98)';
+const POLL_TITLE_ACTIVE_COLOR = 'rgba(255, 255, 255, 0.96)';
+
 type PollListProps = {
   selectedRef: string | undefined;
+  interactionLocked: boolean;
   onSelect: (ref: string) => void;
   onCollapse: () => void;
 };
 
-export const PollList = ({ selectedRef, onSelect, onCollapse }: PollListProps) => {
+export const PollList = ({
+  selectedRef,
+  interactionLocked,
+  onSelect,
+  onCollapse,
+}: PollListProps) => {
   const { act, data } = useBackend<Data>();
   const { polls, is_pollster } = data;
 
@@ -49,7 +66,8 @@ export const PollList = ({ selectedRef, onSelect, onCollapse }: PollListProps) =
               <Button
                 icon="rotate"
                 tooltip="Перезагрузить опросы из базы данных"
-                onClick={() => act('reload_polls')}
+                onClick={() => !interactionLocked && act('reload_polls')}
+                style={interactionLocked ? uiLockedGreystyle : undefined}
               />
             </Stack.Item>
           )}
@@ -72,6 +90,7 @@ export const PollList = ({ selectedRef, onSelect, onCollapse }: PollListProps) =
               <PollCard
                 poll={poll}
                 active={poll.ref === selectedRef}
+                interactionLocked={interactionLocked}
                 onSelect={onSelect}
               />
             </Stack.Item>
@@ -85,10 +104,12 @@ export const PollList = ({ selectedRef, onSelect, onCollapse }: PollListProps) =
 const PollCard = ({
   poll,
   active,
+  interactionLocked,
   onSelect,
 }: {
   poll: PollBrief;
   active: boolean;
+  interactionLocked: boolean;
   onSelect: (ref: string) => void;
 }) => {
   const { act } = useBackend<Data>();
@@ -112,36 +133,43 @@ const PollCard = ({
   const metaOpacity = isArchived ? 0.62 : 0.88;
   const iconOpacity = isArchived ? 0.72 : 1;
 
+  const cardStyle: CSSProperties = {
+    margin: 0,
+    height: 'auto',
+    whiteSpace: 'normal',
+    paddingTop: '0.35rem',
+    paddingBottom: '0.35rem',
+    borderRadius: '6px',
+    backgroundColor: baseBackground,
+    border: `1px solid ${borderColor}`,
+    boxShadow: glow,
+    backdropFilter: 'blur(1px)',
+    ...(interactionLocked ? uiLockedGreystyle : {}),
+  };
+
   return (
     <Button
       fluid
       textAlign="left"
-      selected={active}
+      selected={false}
       color="transparent"
-      style={{
-        margin: 0,
-        height: 'auto',
-        whiteSpace: 'normal',
-        paddingTop: '0.35rem',
-        paddingBottom: '0.35rem',
-        borderRadius: '6px',
-        backgroundColor: baseBackground,
-        border: `1px solid ${borderColor}`,
-        boxShadow: glow,
-        backdropFilter: 'blur(1px)',
-      }}
+      style={cardStyle}
       onClick={(event) => {
         event.stopPropagation();
-        if (!active) {
-          onSelect(poll.ref);
-          act('select_poll', { ref: poll.ref });
-        }
+        if (interactionLocked || active) return;
+        onSelect(poll.ref);
+        act('select_poll', { ref: poll.ref });
       }}
     >
       <Stack align="center" g={0.75}>
-        <Stack.Item width="1.75rem" textAlign="center" color="label" style={{ opacity: iconOpacity }}>
-          <Tooltip content={POLL_TYPE_LABELS[poll.poll_type]}>
-            <Icon name={POLL_TYPE_ICONS[poll.poll_type]} />
+        <Stack.Item
+          width="1.75rem"
+          textAlign="center"
+          color="label"
+          style={{ opacity: iconOpacity }}
+        >
+          <Tooltip content={pollTypeLabels[poll.poll_type]}>
+            <Icon name={pollTypeIcons[poll.poll_type]} />
           </Tooltip>
         </Stack.Item>
         <Stack.Item grow style={{ minWidth: 0 }}>
@@ -149,7 +177,16 @@ const PollCard = ({
             <Stack.Item>
               <Stack align="center">
                 <Stack.Item grow>
-                  <Box bold style={{ overflowWrap: 'anywhere', opacity: titleOpacity }}>
+                  <Box
+                    bold
+                    style={{
+                      overflowWrap: 'anywhere',
+                      opacity: titleOpacity,
+                      color: active
+                        ? POLL_TITLE_ACTIVE_COLOR
+                        : POLL_TITLE_IDLE_COLOR,
+                    }}
+                  >
                     {poll.question}
                   </Box>
                 </Stack.Item>
@@ -181,7 +218,11 @@ const PollCard = ({
               </Stack>
             </Stack.Item>
             <Stack.Item>
-              <Box color="label" fontSize={0.88} opacity={metaOpacity}>
+              <Box
+                fontSize={0.88}
+                opacity={metaOpacity}
+                style={{ color: 'rgba(220, 224, 230, 0.82)' }}
+              >
                 <Icon name="users" /> {poll.total_votes}
                 {' | '}
                 <Icon name="calendar-day" />{' '}

@@ -1,19 +1,39 @@
-import { Box, Button, Icon, NoticeBox, Section, Slider, Stack, TextArea } from 'tgui-core/components';
+import type { CSSProperties } from 'react';
+import {
+  Box,
+  Button,
+  Icon,
+  NoticeBox,
+  Section,
+  Slider,
+  Stack,
+  TextArea,
+} from 'tgui-core/components';
 
 import type { PollOption, SelectedPoll } from './types';
 import type { VoteDraft } from './voteDraft';
+
+const rowLockedGreystyle: CSSProperties = {
+  opacity: 0.52,
+  filter: 'grayscale(0.38)',
+  pointerEvents: 'none',
+  cursor: 'not-allowed',
+};
 
 type VoteTabProps = {
   poll: SelectedPoll;
   draft: VoteDraft;
   setDraft: (draft: VoteDraft) => void;
+  // Block edits when server processing a poll action
+  controlsLocked?: boolean;
 };
 
-/**
- * Голосование в выбранном опросе. Draft-состояние голоса поднято в PollDetails,
- * чтобы сабмит можно было отрендерить в прилепленном к низу футере.
- */
-export const VoteTab = ({ poll, draft, setDraft }: VoteTabProps) => {
+export const VoteTab = ({
+  poll,
+  draft,
+  setDraft,
+  controlsLocked = false,
+}: VoteTabProps) => {
   const alreadyVoted = hasUserVoted(poll);
 
   if (alreadyVoted && !poll.allow_revoting) {
@@ -26,15 +46,49 @@ export const VoteTab = ({ poll, draft, setDraft }: VoteTabProps) => {
 
   switch (poll.poll_type) {
     case 'OPTION':
-      return <VoteOption poll={poll} draft={draft} setDraft={setDraft} />;
+      return (
+        <VoteOption
+          poll={poll}
+          draft={draft}
+          setDraft={setDraft}
+          controlsLocked={controlsLocked}
+        />
+      );
     case 'TEXT':
-      return <VoteText draft={draft} setDraft={setDraft} />;
+      return (
+        <VoteText
+          draft={draft}
+          setDraft={setDraft}
+          controlsLocked={controlsLocked}
+        />
+      );
     case 'NUMVAL':
-      return <VoteRating poll={poll} draft={draft} setDraft={setDraft} />;
+      return (
+        <VoteRating
+          poll={poll}
+          draft={draft}
+          setDraft={setDraft}
+          controlsLocked={controlsLocked}
+        />
+      );
     case 'MULTICHOICE':
-      return <VoteMulti poll={poll} draft={draft} setDraft={setDraft} />;
+      return (
+        <VoteMulti
+          poll={poll}
+          draft={draft}
+          setDraft={setDraft}
+          controlsLocked={controlsLocked}
+        />
+      );
     case 'IRV':
-      return <VoteIRV poll={poll} draft={draft} setDraft={setDraft} />;
+      return (
+        <VoteIRV
+          poll={poll}
+          draft={draft}
+          setDraft={setDraft}
+          controlsLocked={controlsLocked}
+        />
+      );
     default:
       return <NoticeBox danger>Неизвестный тип опроса.</NoticeBox>;
   }
@@ -51,9 +105,12 @@ function hasUserVoted(poll: SelectedPoll): boolean {
   return false;
 }
 
-// ─── Radio-like одиночный выбор ───────────────────────────────────────────────
-
-const VoteOption = ({ poll, draft, setDraft }: VoteTabProps) => {
+const VoteOption = ({
+  poll,
+  draft,
+  setDraft,
+  controlsLocked = false,
+}: VoteTabProps) => {
   const selectedRef = draft.optionRef;
 
   return (
@@ -65,6 +122,8 @@ const VoteOption = ({ poll, draft, setDraft }: VoteTabProps) => {
             <ChoiceRow
               kind="radio"
               selected={isSelected}
+              disabled={controlsLocked}
+              tooltip={controlsLocked ? 'Ожидание ответа сервера…' : undefined}
               label={option.text}
               onClick={() => setDraft({ ...draft, optionRef: option.ref })}
             />
@@ -75,11 +134,10 @@ const VoteOption = ({ poll, draft, setDraft }: VoteTabProps) => {
   );
 };
 
-// ─── Свободный текст ──────────────────────────────────────────────────────────
-
 const VoteText = ({
   draft,
   setDraft,
+  controlsLocked = false,
 }: Omit<VoteTabProps, 'poll'>) => {
   const text = draft.text ?? '';
 
@@ -98,7 +156,10 @@ const VoteText = ({
           height="100%"
           value={text}
           maxLength={2048}
-          onChange={(value) => setDraft({ ...draft, text: value })}
+          style={controlsLocked ? rowLockedGreystyle : undefined}
+          onChange={(value) =>
+            !controlsLocked && setDraft({ ...draft, text: value })
+          }
           placeholder="Введите ваш ответ..."
         />
       </Stack.Item>
@@ -111,9 +172,12 @@ const VoteText = ({
   );
 };
 
-// ─── Рейтинг ──────────────────────────────────────────────────────────────────
-
-const VoteRating = ({ poll, draft, setDraft }: VoteTabProps) => {
+const VoteRating = ({
+  poll,
+  draft,
+  setDraft,
+  controlsLocked = false,
+}: VoteTabProps) => {
   const ratings = draft.ratings ?? {};
 
   return (
@@ -128,6 +192,7 @@ const VoteRating = ({ poll, draft, setDraft }: VoteTabProps) => {
               option.min_val ??
               1
             }
+            controlsLocked={controlsLocked}
             onChange={(v) =>
               setDraft({
                 ...draft,
@@ -145,16 +210,25 @@ const RatingRow = ({
   option,
   value,
   onChange,
+  controlsLocked = false,
 }: {
   option: PollOption;
   value: number;
   onChange: (v: number) => void;
+  controlsLocked?: boolean;
 }) => {
   const min = option.min_val ?? 1;
   const max = option.max_val ?? 5;
 
   return (
-    <Section title={option.text}>
+    <Section
+      title={option.text}
+      style={
+        controlsLocked
+          ? { opacity: 0.55, pointerEvents: 'none' as const }
+          : undefined
+      }
+    >
       <Stack vertical>
         {(option.desc_min || option.desc_mid || option.desc_max) && (
           <Stack.Item>
@@ -181,7 +255,7 @@ const RatingRow = ({
             minValue={min}
             maxValue={max}
             step={1}
-            onChange={(_, v) => onChange(v)}
+            onChange={(_, v) => !controlsLocked && onChange(v)}
           />
         </Stack.Item>
       </Stack>
@@ -189,13 +263,17 @@ const RatingRow = ({
   );
 };
 
-// ─── Множественный выбор ──────────────────────────────────────────────────────
-
-const VoteMulti = ({ poll, draft, setDraft }: VoteTabProps) => {
+const VoteMulti = ({
+  poll,
+  draft,
+  setDraft,
+  controlsLocked = false,
+}: VoteTabProps) => {
   const selected = draft.optionRefs ?? [];
   const max = poll.options_allowed ?? poll.options.length;
 
   const toggle = (ref: string) => {
+    if (controlsLocked) return;
     const has = selected.includes(ref);
     let next: string[];
     if (has) {
@@ -222,7 +300,8 @@ const VoteMulti = ({ poll, draft, setDraft }: VoteTabProps) => {
             <ChoiceRow
               kind="checkbox"
               selected={isSelected}
-              disabled={reachedMax}
+              disabled={reachedMax || controlsLocked}
+              tooltip={controlsLocked ? 'Ожидание ответа сервера…' : undefined}
               label={option.text}
               onClick={() => toggle(option.ref)}
             />
@@ -233,9 +312,12 @@ const VoteMulti = ({ poll, draft, setDraft }: VoteTabProps) => {
   );
 };
 
-// ─── IRV ──────────────────────────────────────────────────────────────────────
-
-const VoteIRV = ({ poll, draft, setDraft }: VoteTabProps) => {
+const VoteIRV = ({
+  poll,
+  draft,
+  setDraft,
+  controlsLocked = false,
+}: VoteTabProps) => {
   const order =
     draft.ranking ??
     (poll.user_votes?.ranking?.length
@@ -245,6 +327,7 @@ const VoteIRV = ({ poll, draft, setDraft }: VoteTabProps) => {
       : poll.options.map((o) => o.ref));
 
   const move = (index: number, delta: number) => {
+    if (controlsLocked) return;
     const target = index + delta;
     if (target < 0 || target >= order.length) return;
     const next = [...order];
@@ -258,8 +341,8 @@ const VoteIRV = ({ poll, draft, setDraft }: VoteTabProps) => {
     <Stack vertical>
       <Stack.Item>
         <Box color="label">
-          Расположите варианты в порядке предпочтения (наиболее
-          предпочтительные сверху).
+          Расположите варианты в порядке предпочтения (наиболее предпочтительные
+          сверху).
         </Box>
       </Stack.Item>
       {order.map((ref, index) => {
@@ -276,14 +359,14 @@ const VoteIRV = ({ poll, draft, setDraft }: VoteTabProps) => {
                 <Stack.Item>
                   <IrvButton
                     icon="arrow-up"
-                    disabled={index === 0}
+                    disabled={controlsLocked || index === 0}
                     onClick={() => move(index, -1)}
                   />
                 </Stack.Item>
                 <Stack.Item>
                   <IrvButton
                     icon="arrow-down"
-                    disabled={index === order.length - 1}
+                    disabled={controlsLocked || index === order.length - 1}
                     onClick={() => move(index, 1)}
                   />
                 </Stack.Item>
@@ -311,18 +394,16 @@ const IrvButton = ({
     style={{
       background: 'transparent',
       border: '1px solid var(--color-label)',
-      color: disabled ? 'var(--color-gray)' : 'inherit',
+      color: 'inherit',
       borderRadius: '4px',
       padding: '4px 8px',
       cursor: disabled ? 'not-allowed' : 'pointer',
-      opacity: disabled ? 0.4 : 1,
+      ...(disabled ? rowLockedGreystyle : {}),
     }}
   >
     <Icon name={icon} />
   </Box>
 );
-
-// ─── Общая радио/чекбокс строка ───────────────────────────────────────────────
 
 type ChoiceRowProps = {
   kind: 'radio' | 'checkbox';
@@ -330,6 +411,7 @@ type ChoiceRowProps = {
   disabled?: boolean;
   label: string;
   onClick: () => void;
+  tooltip?: string;
 };
 
 const ChoiceRow = ({
@@ -338,6 +420,7 @@ const ChoiceRow = ({
   disabled,
   label,
   onClick,
+  tooltip,
 }: ChoiceRowProps) => {
   const indicatorIcon =
     kind === 'radio'
@@ -352,12 +435,26 @@ const ChoiceRow = ({
     <Button
       fluid
       textAlign="left"
-      selected={selected}
-      disabled={disabled}
-      color={selected ? 'good' : 'default'}
+      selected={false}
+      color="transparent"
       icon={indicatorIcon}
+      style={{
+        ...(selected
+          ? {
+              color: 'rgba(255, 255, 255, 0.94)',
+              borderLeft: '3px solid hsla(205, 65%, 55%, 0.55)',
+              boxSizing: 'border-box',
+            }
+          : { color: 'rgba(218, 222, 230, 0.88)' }),
+        ...(disabled ? rowLockedGreystyle : {}),
+      }}
       onClick={disabled ? undefined : onClick}
-      tooltip={disabled ? 'Достигнут лимит вариантов' : undefined}
+      tooltip={
+        tooltip ??
+        (disabled && kind === 'checkbox'
+          ? 'Достигнут лимит вариантов'
+          : undefined)
+      }
     >
       {label}
     </Button>

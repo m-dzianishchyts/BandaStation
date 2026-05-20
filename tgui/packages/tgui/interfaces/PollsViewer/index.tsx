@@ -1,12 +1,6 @@
+import type { CSSProperties } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import {
-  Box,
-  Button,
-  Icon,
-  Section,
-  Stack,
-  Tabs,
-} from 'tgui-core/components';
+import { Box, Button, Icon, Section, Stack, Tabs } from 'tgui-core/components';
 
 import { useBackend } from '../../backend';
 import { Window } from '../../layouts';
@@ -22,14 +16,21 @@ import {
 
 type TabId = 'vote' | 'results';
 
+const uiLockedGreystyle: CSSProperties = {
+  opacity: 0.52,
+  filter: 'grayscale(0.38)',
+  pointerEvents: 'none',
+  cursor: 'not-allowed',
+};
+
 export const PollsViewer = () => {
   const { data } = useBackend<Data>();
   const { selected_poll } = data;
   const [listCollapsed, setListCollapsed] = useState(false);
-  // pendingRef: пользователь кликнул по опросу, но детали ещё не пришли от бэкенда.
+  // pendingRef - poll being clicked but no response yet
   const [pendingRef, setPendingRef] = useState<string | null>(null);
 
-  // Когда бэкенд прислал детали -- гасим индикатор загрузки.
+  // change loading indicator when backend sent data
   useEffect(() => {
     if (selected_poll && selected_poll.ref === pendingRef) {
       setPendingRef(null);
@@ -37,6 +38,10 @@ export const PollsViewer = () => {
   }, [selected_poll?.ref, pendingRef]);
 
   const activeRef = selected_poll?.ref ?? pendingRef ?? undefined;
+  const awaitingSelectionDetail = Boolean(
+    pendingRef !== null && (!selected_poll || selected_poll.ref !== pendingRef),
+  );
+  const interactionLocked = awaitingSelectionDetail || Boolean(data.ui_busy);
 
   return (
     <Window title="Опросы" width={1024} height={680}>
@@ -50,6 +55,7 @@ export const PollsViewer = () => {
             >
               <PollList
                 selectedRef={activeRef}
+                interactionLocked={interactionLocked}
                 onSelect={(ref) => setPendingRef(ref)}
                 onCollapse={() => setListCollapsed(true)}
               />
@@ -59,10 +65,7 @@ export const PollsViewer = () => {
             <Stack fill vertical>
               {listCollapsed && (
                 <Stack.Item>
-                  <Button
-                    icon="bars"
-                    onClick={() => setListCollapsed(false)}
-                  >
+                  <Button icon="bars" onClick={() => setListCollapsed(false)}>
                     Показать список опросов
                   </Button>
                 </Stack.Item>
@@ -71,6 +74,7 @@ export const PollsViewer = () => {
                 <RightPane
                   selected={selected_poll}
                   pendingRef={pendingRef}
+                  interactionLocked={interactionLocked}
                 />
               </Stack.Item>
             </Stack>
@@ -84,15 +88,23 @@ export const PollsViewer = () => {
 const RightPane = ({
   selected,
   pendingRef,
+  interactionLocked,
 }: {
   selected: SelectedPoll | null;
   pendingRef: string | null;
+  interactionLocked: boolean;
 }) => {
   if (pendingRef && (!selected || selected.ref !== pendingRef)) {
     return <LoadingState />;
   }
   if (selected) {
-    return <PollDetails key={selected.ref} poll={selected} />;
+    return (
+      <PollDetails
+        key={selected.ref}
+        poll={selected}
+        interactionLocked={interactionLocked}
+      />
+    );
   }
   return <EmptyState />;
 };
@@ -125,14 +137,20 @@ const LoadingState = () => (
   </Section>
 );
 
-const PollDetails = ({ poll }: { poll: SelectedPoll }) => {
-  const { act } = useBackend<Data>();
+const PollDetails = ({
+  poll,
+  interactionLocked,
+}: {
+  poll: SelectedPoll;
+  interactionLocked: boolean;
+}) => {
+  const { act, data } = useBackend<Data>();
   const canVote = !poll.finished;
   const [activeTab, setActiveTab] = useState<TabId>(
     canVote ? 'vote' : 'results',
   );
 
-  // Black-magic: useRef чтобы не пересоздавать initial draft при каждом рендере.
+  // useRef so we can skip initial draft creation on each call
   const initialDraftRef = useRef<VoteDraft | null>(null);
   if (initialDraftRef.current === null) {
     initialDraftRef.current = makeInitialDraft(poll);
@@ -143,13 +161,13 @@ const PollDetails = ({ poll }: { poll: SelectedPoll }) => {
   const submitCheck = buildVotePayload(poll.poll_type, draft);
 
   const doSubmit = () => {
-    if (!submitCheck.ready) return;
+    if (!submitCheck.ready || data.ui_busy) return;
     act('vote', { poll_ref: poll.ref, ...submitCheck.payload });
     setConfirmingText(false);
   };
 
   const handleSubmitClick = () => {
-    if (!submitCheck.ready) return;
+    if (!submitCheck.ready || interactionLocked) return;
     if (poll.poll_type === 'TEXT' && !confirmingText) {
       setConfirmingText(true);
       return;
@@ -186,19 +204,19 @@ const PollDetails = ({ poll }: { poll: SelectedPoll }) => {
           </Stack>
         </Section>
       </Stack.Item>
-      <Stack.Item>
+      <Stack.Item style={interactionLocked ? uiLockedGreystyle : undefined}>
         <Tabs>
           <Tabs.Tab
             icon="check-to-slot"
             selected={activeTab === 'vote'}
-            onClick={() => setActiveTab('vote')}
+            onClick={() => !interactionLocked && setActiveTab('vote')}
           >
             Голосование
           </Tabs.Tab>
           <Tabs.Tab
             icon="chart-column"
             selected={activeTab === 'results'}
-            onClick={() => setActiveTab('results')}
+            onClick={() => !interactionLocked && setActiveTab('results')}
           >
             Результаты
           </Tabs.Tab>
@@ -208,7 +226,12 @@ const PollDetails = ({ poll }: { poll: SelectedPoll }) => {
         <Section fill scrollable>
           {activeTab === 'vote' ? (
             canVote ? (
-              <VoteTab poll={poll} draft={draft} setDraft={setDraft} />
+              <VoteTab
+                poll={poll}
+                draft={draft}
+                setDraft={setDraft}
+                controlsLocked={interactionLocked}
+              />
             ) : (
               <Box color="label" textAlign="center" mt={2}>
                 <Icon name="hourglass-end" /> Опрос завершён, голосование
@@ -238,7 +261,12 @@ const PollDetails = ({ poll }: { poll: SelectedPoll }) => {
                     <Stack.Item>
                       <Button
                         icon="xmark"
-                        onClick={() => setConfirmingText(false)}
+                        style={
+                          interactionLocked ? uiLockedGreystyle : undefined
+                        }
+                        onClick={() =>
+                          !interactionLocked && setConfirmingText(false)
+                        }
                       >
                         Отмена
                       </Button>
@@ -248,11 +276,17 @@ const PollDetails = ({ poll }: { poll: SelectedPoll }) => {
                     <Button
                       icon={confirmingText ? 'check' : 'paper-plane'}
                       color={submitCheck.ready ? 'good' : 'default'}
-                      disabled={!submitCheck.ready}
+                      style={
+                        !submitCheck.ready || interactionLocked
+                          ? uiLockedGreystyle
+                          : undefined
+                      }
                       tooltip={
                         !submitCheck.ready && 'reason' in submitCheck
                           ? submitCheck.reason
-                          : undefined
+                          : interactionLocked
+                            ? 'Ожидание ответа сервера…'
+                            : undefined
                       }
                       onClick={handleSubmitClick}
                     >

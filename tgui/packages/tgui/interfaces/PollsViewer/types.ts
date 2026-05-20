@@ -99,4 +99,6 @@ export type Data = {
   is_pollster: BooleanLike;
   ckey: string;
   selected_poll: SelectedPoll | null;
+  // Server side lock while poll UI runs a DB update
+  ui_busy?: BooleanLike;
 };

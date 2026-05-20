@@ -5,6 +5,8 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 	var/list/selected_poll_by_ckey = list()
 	/// Finished polls loaded from DB for admin requests
 	var/list/archived_polls_cache = list()
+	/// Prevents stacked TGUI actions per ckey while a DB update runs
+	var/list/polls_ui_busy = list()
 
 /datum/polls_viewer/ui_state(mob/user)
 	return GLOB.always_state
@@ -13,6 +15,7 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 	. = ..()
 	if(user.client?.ckey)
 		selected_poll_by_ckey -= user.client.ckey
+		polls_ui_busy -= user.client.ckey
 
 /datum/polls_viewer/ui_interact(mob/user, datum/tgui/ui)
 	ui = SStgui.try_update_ui(user, src, ui)
@@ -21,7 +24,23 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 		ui.open()
 
 /datum/polls_viewer/ui_data(mob/user)
-	return list()
+	var/list/data = list()
+	var/ckey = user.client?.ckey
+	if(ckey)
+		data["ui_busy"] = !!polls_ui_busy[ckey]
+	return data
+
+/// Returns FALSE if already busy — caller should noop and optionally return blocked.
+/datum/polls_viewer/proc/try_begin_polls_ui_busy(ckey)
+	if(!ckey)
+		return FALSE
+	if(polls_ui_busy[ckey])
+		return FALSE
+	polls_ui_busy[ckey] = TRUE
+	return TRUE
+
+/datum/polls_viewer/proc/end_polls_ui_busy(ckey)
+	polls_ui_busy -= ckey
 
 /datum/polls_viewer/ui_static_data(mob/user)
 	var/list/data = list()
@@ -155,23 +174,17 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 	if(!ckey || !SSdbcore.Connect())
 		return result
 
-	var/datum/db_query/query = SSdbcore.NewQuery(
-		"SELECT DISTINCT pollid FROM [format_table_name("poll_vote")] WHERE ckey = :ckey AND deleted = 0",
-		list("ckey" = ckey)
-	)
+	var/datum/db_query/query = SSdbcore.NewQuery({"
+		SELECT pollid FROM (
+			SELECT pollid FROM [format_table_name("poll_vote")] WHERE ckey = :ckey AND deleted = 0
+			UNION
+			SELECT pollid FROM [format_table_name("poll_textreply")] WHERE ckey = :ckey AND deleted = 0
+		) AS participated
+	"}, list("ckey" = ckey))
 	if(query.warn_execute())
 		while(query.NextRow())
 			result["[query.item[1]]"] = TRUE
 	qdel(query)
-
-	var/datum/db_query/query_text = SSdbcore.NewQuery(
-		"SELECT DISTINCT pollid FROM [format_table_name("poll_textreply")] WHERE ckey = :ckey AND deleted = 0",
-		list("ckey" = ckey)
-	)
-	if(query_text.warn_execute())
-		while(query_text.NextRow())
-			result["[query_text.item[1]]"] = TRUE
-	qdel(query_text)
 
 	return result
 
@@ -192,6 +205,12 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 /datum/polls_viewer/proc/is_poll_finished(datum/poll_question/poll)
 	if(!poll.end_datetime)
 		return FALSE
+	// Archived polls were ended in DB before they were listed
+	if(is_archived_cached_poll(poll))
+		return TRUE
+	var/current_stamp = ISOtime(world.timeofday)
+	if(length(poll.end_datetime) == 19 && length(current_stamp) == 19)
+		return current_stamp > poll.end_datetime
 	if(!SSdbcore.Connect())
 		return FALSE
 	var/datum/db_query/query = SSdbcore.NewQuery(
@@ -204,6 +223,12 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 	var/finished = query.NextRow() ? text2num(query.item[1]) : FALSE
 	qdel(query)
 	return finished
+
+/datum/polls_viewer/proc/is_archived_cached_poll(datum/poll_question/poll)
+	for(var/key in archived_polls_cache)
+		if(archived_polls_cache[key] == poll)
+			return TRUE
+	return FALSE
 
 /**
  * Builds full data for selected poll:

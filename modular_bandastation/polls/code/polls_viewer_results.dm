@@ -121,37 +121,40 @@
 		"options" = list(),
 	)
 
+	// option_id string -> rating string -> vote count
+	var/list/votes_by_option_rating = list()
+	var/datum/db_query/query = SSdbcore.NewQuery(
+		"SELECT optionid, rating, COUNT(DISTINCT ckey) FROM [format_table_name("poll_vote")] WHERE pollid = :poll_id AND deleted = 0 AND rating IS NOT NULL GROUP BY optionid, rating",
+		list("poll_id" = poll.poll_id)
+	)
+	if(query.warn_execute())
+		while(query.NextRow())
+			var/option_key = "[text2num(query.item[1])]"
+			var/rating = text2num(query.item[2])
+			var/count = text2num(query.item[3])
+			if(!votes_by_option_rating[option_key])
+				votes_by_option_rating[option_key] = list()
+			var/list/rating_row = votes_by_option_rating[option_key]
+			rating_row["[rating]"] = count
+	qdel(query)
+
 	for(var/datum/poll_option/option as anything in poll.options)
-		var/list/ratings_dist = list()
 		var/min_v = option.min_val
 		var/max_v = option.max_val
-
-		// Initialize all rating buckets with zero values
-		for(var/i in min_v to max_v)
-			ratings_dist["[i]"] = 0
-
-		var/datum/db_query/query = SSdbcore.NewQuery(
-			"SELECT rating, COUNT(DISTINCT ckey) FROM [format_table_name("poll_vote")] WHERE pollid = :poll_id AND optionid = :option_id AND deleted = 0 AND rating IS NOT NULL GROUP BY rating",
-			list("poll_id" = poll.poll_id, "option_id" = option.option_id)
-		)
-
+		var/option_key = "[option.option_id]"
+		var/list/rating_counts = votes_by_option_rating[option_key] || list()
 		var/total_voters = 0
 		var/sum = 0
-		if(query.warn_execute())
-			while(query.NextRow())
-				var/rating = text2num(query.item[1])
-				var/count = text2num(query.item[2])
-				ratings_dist["[rating]"] = count
-				total_voters += count
-				sum += rating * count
-		qdel(query)
-
 		var/list/distribution = list()
 		for(var/i in min_v to max_v)
+			var/raw_count = rating_counts["[i]"]
+			var/bucket_votes = isnull(raw_count) ? 0 : text2num(raw_count)
 			distribution += list(list(
 				"value" = i,
-				"votes" = ratings_dist["[i]"],
+				"votes" = bucket_votes,
 			))
+			total_voters += bucket_votes
+			sum += i * bucket_votes
 
 		result["options"] += list(list(
 			"option_id" = option.option_id,

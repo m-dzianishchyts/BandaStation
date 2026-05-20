@@ -10,49 +10,71 @@
 
 	switch(action)
 		if("select_poll")
+			if(!try_begin_polls_ui_busy(ckey))
+				return TRUE
+			ui.send_update(force = TRUE)
 			var/ref_str = params["ref"]
 			var/datum/poll_question/poll
 			if(findtext(ref_str, "archived:") == 1)
 				if(!user.client.holder)
+					end_polls_ui_busy(ckey)
+					ui.send_update(force = TRUE)
 					return TRUE
 				var/poll_id = text2num(copytext(ref_str, length("archived:") + 1))
 				poll = ensure_archived_poll_loaded(poll_id)
 			else
 				poll = locate(ref_str) in GLOB.polls
-			if(!poll)
-				return TRUE
-			if((poll.admin_only || poll.future_poll) && !user.client.holder)
+			if(!poll || ((poll.admin_only || poll.future_poll) && !user.client.holder))
+				end_polls_ui_busy(ckey)
+				ui.send_update(force = TRUE)
 				return TRUE
 			selected_poll_by_ckey[ckey] = poll
-			ui.send_full_update()
+			end_polls_ui_busy(ckey)
+			ui.send_full_update(force = TRUE, always_instant = TRUE)
 			return TRUE
 
 		if("back_to_list")
+			if(!try_begin_polls_ui_busy(ckey))
+				return TRUE
+			ui.send_update(force = TRUE)
 			selected_poll_by_ckey -= ckey
-			ui.send_full_update()
+			end_polls_ui_busy(ckey)
+			ui.send_full_update(force = TRUE, always_instant = TRUE)
 			return TRUE
 
 		if("vote")
+			if(!try_begin_polls_ui_busy(ckey))
+				return TRUE
+			ui.send_update(force = TRUE)
 			var/datum/poll_question/poll = locate(params["poll_ref"]) in GLOB.polls
 			if(!poll)
+				end_polls_ui_busy(ckey)
+				ui.send_update(force = TRUE)
 				return TRUE
 			handle_vote(poll, user, params)
-
-			// Refresh results and voted flags
-			ui.send_full_update()
+			end_polls_ui_busy(ckey)
+			ui.send_full_update(force = TRUE, always_instant = TRUE)
 			return TRUE
 
 		if("refresh")
-			ui.send_full_update()
+			if(!try_begin_polls_ui_busy(ckey))
+				return TRUE
+			ui.send_update(force = TRUE)
+			end_polls_ui_busy(ckey)
+			ui.send_full_update(force = TRUE, always_instant = TRUE)
 			return TRUE
 
 		if("reload_polls")
 			if(!user.client.holder)
 				return TRUE
+			if(!try_begin_polls_ui_busy(ckey))
+				return TRUE
+			ui.send_update(force = TRUE)
 			GLOB.polls.Cut()
 			GLOB.poll_options.Cut()
 			load_poll_data()
-			ui.send_full_update()
+			end_polls_ui_busy(ckey)
+			ui.send_full_update(force = TRUE, always_instant = TRUE)
 			return TRUE
 
 /**
