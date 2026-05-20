@@ -744,6 +744,22 @@ html.loading {
   content: "\f70e";
 }
 
+.lobby-polls .lobby-text:before {
+  content: "\f059";
+}
+
+.lobby-polls.has-indicator .lobby-text:after {
+  content: "";
+  position: absolute;
+  top: -11px;
+  right: -11px;
+  width: 8px;
+  height: 8px;
+  background-color: var(--color-text-good);
+  border-radius: 50%;
+  box-shadow: 0 0 4px var(--color-text-good);
+}
+
 .checkbox .lobby-text:before {
   font-weight: 400;
 }

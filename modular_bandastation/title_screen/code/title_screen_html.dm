@@ -96,8 +96,11 @@
 			html += create_public_traits(player)
 
 		html += create_button(player, "observe", "Наблюдать")
+		var/unvoted_polls = count_unvoted_polls(player)
+		var/polls_classes = unvoted_polls > 0 ? "has-indicator" : ""
 		html += {"
 			[create_button(player, "manifest", "Манифест персонала")]
+			[create_button(player, "polls", "Текущие опросы", tooltip = "Доступно [unvoted_polls] опрос(ов)", advanced_classes = polls_classes)]
 			<hr>
 			[create_button(player, "character_setup", "Настройка персонажа")]
 			[create_button(player, "settings", "Настройки игры")]
@@ -187,3 +190,15 @@
 		html += create_button(player, "", "[trait.name]", "[trait.report_message]")
 
 	return html.Join()
+
+/**
+ * Count unvoted polls available to the player.
+ */
+/datum/title_screen/proc/count_unvoted_polls(mob/dead/new_player/player)
+	var/count = 0
+	for(var/p in GLOB.polls)
+		var/datum/poll_question/poll = p
+		if((poll.admin_only && !player.client.holder) || poll.future_poll)
+			continue
+		count++
+	return count

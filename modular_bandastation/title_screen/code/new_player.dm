@@ -99,6 +99,17 @@
 	else if(href_list["manifest"])
 		ViewManifest()
 
+	else if(href_list["polls"])
+		GLOB.polls_viewer.ui_interact(src)
+
+	else if(href_list["viewpoll"])
+		var/datum/poll_question/poll = locate(href_list["viewpoll"]) in GLOB.polls
+		poll_player(poll)
+
+	else if(href_list["votepollref"])
+		var/datum/poll_question/poll = locate(href_list["votepollref"]) in GLOB.polls
+		vote_on_poll_handler(poll, href_list)
+
 	else if(href_list["trait_signup"])
 		var/datum/station_trait/clicked_trait
 		for(var/datum/station_trait/trait as anything in GLOB.lobby_station_traits)
