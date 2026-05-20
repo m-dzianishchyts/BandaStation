@@ -12,6 +12,7 @@ import {
 
 import type { PollOption, SelectedPoll } from './types';
 import type { VoteDraft } from './voteDraft';
+import { isVoteSubmitBlocked } from './voteDraft';
 
 const rowLockedGreystyle: CSSProperties = {
   opacity: 0.52,
@@ -34,9 +35,7 @@ export const VoteTab = ({
   setDraft,
   controlsLocked = false,
 }: VoteTabProps) => {
-  const alreadyVoted = hasUserVoted(poll);
-
-  if (alreadyVoted && !poll.allow_revoting) {
+  if (isVoteSubmitBlocked(poll)) {
     return (
       <NoticeBox success>
         <Icon name="check" /> Вы уже проголосовали.
@@ -94,17 +93,6 @@ export const VoteTab = ({
   }
 };
 
-function hasUserVoted(poll: SelectedPoll): boolean {
-  const uv = poll.user_votes;
-  if (!uv) return false;
-  if (uv.option_id !== undefined && uv.option_id !== null) return true;
-  if (uv.option_ids && uv.option_ids.length > 0) return true;
-  if (uv.ranking && uv.ranking.length > 0) return true;
-  if (uv.ratings && Object.keys(uv.ratings).length > 0) return true;
-  if (uv.text) return true;
-  return false;
-}
-
 const VoteOption = ({
   poll,
   draft,
@@ -145,8 +133,8 @@ const VoteText = ({
     <Stack fill vertical>
       <Stack.Item>
         <NoticeBox info>
-          <Icon name="circle-info" /> Ответы отправляются анонимно, но должны
-          соответствовать правилам проекта. Недопустимые ответы могут быть
+          <Icon name="circle-info" /> Другие не видят, чей это ответ. Отправляя
+          текст, вы соглашаетесь с правилами. Недопустимые ответы могут быть
           удалены администрацией.
         </NoticeBox>
       </Stack.Item>

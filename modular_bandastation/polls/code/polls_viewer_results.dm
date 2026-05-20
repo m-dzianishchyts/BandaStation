@@ -1,25 +1,28 @@
 /**
  * Poll results calculation, mirrors Statbus.
  */
-/datum/polls_viewer/proc/calculate_poll_results(datum/poll_question/poll)
+/datum/polls_viewer/proc/calculate_poll_results(datum/poll_question/poll, include_admin_vote_data = FALSE)
 	if(!SSdbcore.Connect())
 		return null
 
+	var/list/result = null
 	switch(poll.poll_type)
 		if(POLLTYPE_OPTION)
-			return tally_option_poll(poll)
+			result = tally_option_poll(poll)
 		if(POLLTYPE_MULTI)
-			return tally_multi_poll(poll)
+			result = tally_multi_poll(poll)
 		if(POLLTYPE_RATING)
-			return tally_rating_poll(poll)
+			result = tally_rating_poll(poll)
 		if(POLLTYPE_TEXT)
-			return tally_text_poll(poll)
+			result = tally_text_poll(poll, include_admin_vote_data)
 		if(POLLTYPE_IRV)
-			return list(
+			result = list(
 				"type" = POLLTYPE_IRV,
 				"note" = "Этот тип опроса не поддерживается.",
 			)
-	return null
+	if(include_admin_vote_data && result && (poll.poll_type == POLLTYPE_OPTION || poll.poll_type == POLLTYPE_MULTI || poll.poll_type == POLLTYPE_RATING))
+		result["respondent_ckeys"] = fetch_vote_respondent_ckeys(poll)
+	return result
 
 /**
  * OPTION: unique votes by option_id, sorted descending.
@@ -171,33 +174,53 @@
 
 	return result
 
-/**
- * TEXT: anonymous list of replies.
- * ckey is intentionally not exposed to UI.
- */
-/datum/polls_viewer/proc/tally_text_poll(datum/poll_question/poll)
+
+/// Anonymous replies with optional row ids for admins
+/datum/polls_viewer/proc/tally_text_poll(datum/poll_question/poll, include_reply_ids = FALSE)
 	var/list/result = list(
 		"type" = POLLTYPE_TEXT,
 		"replies" = list(),
 	)
 
-	// ckey is intentionally omitted
-	var/datum/db_query/query = SSdbcore.NewQuery(
-		"SELECT replytext, datetime FROM [format_table_name("poll_textreply")] WHERE pollid = :poll_id AND deleted = 0 ORDER BY datetime DESC",
-		list("poll_id" = poll.poll_id)
-	)
+	var/sql = include_reply_ids ? {"
+			SELECT id, replytext, datetime FROM [format_table_name("poll_textreply")] WHERE pollid = :poll_id AND deleted = 0 ORDER BY datetime DESC
+			"} : {"
+			SELECT replytext, datetime FROM [format_table_name("poll_textreply")] WHERE pollid = :poll_id AND deleted = 0 ORDER BY datetime DESC
+			"}
+	var/datum/db_query/query = SSdbcore.NewQuery(sql, list("poll_id" = poll.poll_id))
 	if(!query.warn_execute())
 		qdel(query)
 		return result
 
 	while(query.NextRow())
-		result["replies"] += list(list(
-			"text" = query.item[1],
-			"datetime" = query.item[2],
-		))
+		var/list/card = include_reply_ids ? list(
+				"id" = text2num(query.item[1]),
+				"text" = query.item[2],
+				"datetime" = query.item[3],
+			) : list(
+				"text" = query.item[1],
+				"datetime" = query.item[2],
+			)
+		result["replies"] += list(card)
 	qdel(query)
 
 	return result
+
+/datum/polls_viewer/proc/fetch_vote_respondent_ckeys(datum/poll_question/poll)
+	var/list/out = list()
+	if(!poll?.poll_id || poll.poll_type == POLLTYPE_TEXT || !SSdbcore.Connect())
+		return out
+	var/datum/db_query/query = SSdbcore.NewQuery(
+		"SELECT DISTINCT ckey FROM [format_table_name("poll_vote")] WHERE pollid = :poll_id AND deleted = 0 ORDER BY ckey ASC",
+		list("poll_id" = poll.poll_id)
+	)
+	if(query.warn_execute())
+		while(query.NextRow())
+			var/ckey_found = "[query.item[1]]"
+			if(ckey_found)
+				out += ckey_found
+	qdel(query)
+	return out
 
 /// Comparator for descending vote sort.
 /proc/cmp_poll_result_votes_desc(list/a, list/b)

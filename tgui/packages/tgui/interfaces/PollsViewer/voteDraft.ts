@@ -1,9 +1,6 @@
 import type { PollType, SelectedPoll } from './types';
 
-/**
- * Черновик голоса пользователя. Хранится в состоянии PollDetails и передаётся вниз,
- * чтобы footer-кнопка Отправить могла собрать payload для ui_act.
- */
+/** Stored in PollDetails and passed further so the send action can get the payload for ui_act. */
 export type VoteDraft = {
   optionRef?: string;
   optionRefs?: string[];
@@ -11,6 +8,24 @@ export type VoteDraft = {
   ranking?: string[];
   text?: string;
 };
+
+/** True if the server supplied an existing ballot for this user for this poll. */
+export function hasUserVoteRecord(poll: SelectedPoll): boolean {
+  const uv = poll.user_votes;
+  if (!uv) return false;
+  if (uv.option_id !== undefined && uv.option_id !== null) return true;
+  if (uv.option_ids && uv.option_ids.length > 0) return true;
+  if (uv.ranking && uv.ranking.length > 0) return true;
+  if (uv.ratings && Object.keys(uv.ratings).length > 0) return true;
+  if (uv.text !== undefined && uv.text !== null && String(uv.text).trim())
+    return true;
+  return false;
+}
+
+/** User already answered and poll does not permit changing vote. */
+export function isVoteSubmitBlocked(poll: SelectedPoll): boolean {
+  return hasUserVoteRecord(poll) && !poll.allow_revoting;
+}
 
 export function makeInitialDraft(poll: SelectedPoll): VoteDraft {
   const uv = poll.user_votes;
@@ -54,9 +69,7 @@ export function makeInitialDraft(poll: SelectedPoll): VoteDraft {
   return {};
 }
 
-/**
- * Готов ли черновик к отправке. Также возвращает payload для ui_act, если готов.
- */
+/** Returns payload for ui_act if ready. */
 export function buildVotePayload(
   type: PollType,
   draft: VoteDraft,

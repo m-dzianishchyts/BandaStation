@@ -78,6 +78,12 @@
 			ui.send_full_update(force = TRUE, always_instant = TRUE)
 			return TRUE
 
+		if("admin_delete_text_reply")
+			return handle_polls_admin_delete_text_reply(ui, user, ckey, params)
+
+		if("admin_delete_respondent_votes")
+			return handle_polls_admin_delete_respondent(ui, user, ckey, params)
+
 /**
  * Handles vote payload from TGUI.
  * Adapts incoming params to href_list format expected by vote_on_poll_* procs.
@@ -131,4 +137,94 @@
 				href_list[option_ref] = TRUE
 
 	new_player.vote_on_poll_handler(poll, href_list)
+	return TRUE
+
+/datum/polls_viewer/proc/handle_polls_admin_delete_text_reply(datum/tgui/ui, mob/user, ckey_actor, list/params)
+	if(!try_begin_polls_ui_busy(ckey_actor))
+		return TRUE
+	ui.send_update(force = TRUE)
+	if(!check_rights_for(user.client, R_POLL))
+		end_polls_ui_busy(ckey_actor)
+		ui.send_full_update(force = TRUE, always_instant = TRUE)
+		return TRUE
+	var/datum/poll_question/poll = resolve_poll_for_ui(params["poll_ref"], user)
+	var/reply_row_id = text2num(params["reply_id"])
+	if(!poll?.poll_id || reply_row_id <= 0 || poll.poll_type != POLLTYPE_TEXT || !SSdbcore.Connect())
+		end_polls_ui_busy(ckey_actor)
+		ui.send_full_update(force = TRUE, always_instant = TRUE)
+		return TRUE
+	var/datum/db_query/query_verify = SSdbcore.NewQuery(
+		"SELECT ckey FROM [format_table_name("poll_textreply")] WHERE id = :reply_id AND pollid = :poll_id AND deleted = 0",
+		list("reply_id" = reply_row_id, "poll_id" = poll.poll_id)
+	)
+	if(!query_verify.warn_execute() || !query_verify.NextRow())
+		qdel(query_verify)
+		end_polls_ui_busy(ckey_actor)
+		to_chat(user, span_warning("Ответ не найден или уже удалён."), confidential = TRUE)
+		ui.send_full_update(force = TRUE, always_instant = TRUE)
+		return TRUE
+	var/reply_author = "[query_verify.item[1]]"
+	qdel(query_verify)
+	var/datum/db_query/query_delete = SSdbcore.NewQuery(
+		"UPDATE [format_table_name("poll_textreply")] SET deleted = 1 WHERE id = :reply_id AND pollid = :poll_id AND deleted = 0",
+		list("reply_id" = reply_row_id, "poll_id" = poll.poll_id)
+	)
+	query_delete.warn_execute()
+	qdel(query_delete)
+	refresh_poll_datum_vote_count(poll)
+	var/kna = key_name_admin(user)
+	message_admins("[kna] removed text reply #[reply_row_id] from poll #[poll.poll_id].")
+	log_admin("[key_name(user)] deleted text reply id=[reply_row_id] for poll_id=[poll.poll_id]")
+	to_chat(user, span_notice("Текстовый ответ удалён."), confidential = TRUE)
+	if(length(reply_author))
+		for(var/mob/dead/new_player/np as anything in GLOB.new_player_list)
+			if(np.ckey != reply_author)
+				continue
+			refresh_title_screen_poll_button(np)
+	end_polls_ui_busy(ckey_actor)
+	ui.send_full_update(force = TRUE, always_instant = TRUE)
+	return TRUE
+
+/datum/polls_viewer/proc/handle_polls_admin_delete_respondent(datum/tgui/ui, mob/user, ckey_actor, list/params)
+	if(!try_begin_polls_ui_busy(ckey_actor))
+		return TRUE
+	ui.send_update(force = TRUE)
+	if(!check_rights_for(user.client, R_POLL))
+		end_polls_ui_busy(ckey_actor)
+		ui.send_full_update(force = TRUE, always_instant = TRUE)
+		return TRUE
+	var/datum/poll_question/poll = resolve_poll_for_ui(params["poll_ref"], user)
+	var/target_ckey = params["target_ckey"]
+	if(!poll?.poll_id || !length(target_ckey) || !(poll.poll_type == POLLTYPE_OPTION || poll.poll_type == POLLTYPE_MULTI || poll.poll_type == POLLTYPE_RATING) || !SSdbcore.Connect())
+		end_polls_ui_busy(ckey_actor)
+		ui.send_full_update(force = TRUE, always_instant = TRUE)
+		return TRUE
+	var/datum/db_query/query_verify = SSdbcore.NewQuery(
+		"SELECT COUNT(*) FROM [format_table_name("poll_vote")] WHERE pollid = :poll_id AND ckey = :target_ckey AND deleted = 0",
+		list("poll_id" = poll.poll_id, "target_ckey" = target_ckey)
+	)
+	if(!query_verify.warn_execute() || !query_verify.NextRow() || text2num(query_verify.item[1]) <= 0)
+		qdel(query_verify)
+		end_polls_ui_busy(ckey_actor)
+		to_chat(user, span_warning("У этого игрока нет активных голосов в этом опросе."), confidential = TRUE)
+		ui.send_full_update(force = TRUE, always_instant = TRUE)
+		return TRUE
+	qdel(query_verify)
+	var/datum/db_query/query_delete = SSdbcore.NewQuery(
+		"UPDATE [format_table_name("poll_vote")] SET deleted = 1 WHERE pollid = :poll_id AND ckey = :target_ckey AND deleted = 0",
+		list("poll_id" = poll.poll_id, "target_ckey" = target_ckey)
+	)
+	query_delete.warn_execute()
+	qdel(query_delete)
+	refresh_poll_datum_vote_count(poll)
+	var/kna = key_name_admin(user)
+	message_admins("[kna] removed all votes from ckey '[target_ckey]' on poll #[poll.poll_id].")
+	log_admin("[key_name(user)] deleted poll votes by ckey=[target_ckey] for poll_id=[poll.poll_id]")
+	to_chat(user, span_notice("Голос игрока снят с опроса."), confidential = TRUE)
+	for(var/mob/dead/new_player/np as anything in GLOB.new_player_list)
+		if(np.ckey != target_ckey)
+			continue
+		refresh_title_screen_poll_button(np)
+	end_polls_ui_busy(ckey_actor)
+	ui.send_full_update(force = TRUE, always_instant = TRUE)
 	return TRUE

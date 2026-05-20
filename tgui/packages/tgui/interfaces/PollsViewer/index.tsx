@@ -10,6 +10,7 @@ import type { Data, SelectedPoll } from './types';
 import { VoteTab } from './VoteTab';
 import {
   buildVotePayload,
+  isVoteSubmitBlocked,
   makeInitialDraft,
   type VoteDraft,
 } from './voteDraft';
@@ -154,6 +155,7 @@ const PollDetails = ({
   interactionLocked: boolean;
 }) => {
   const { act, data } = useBackend<Data>();
+  const isPollster = !!data.is_pollster;
   const canVote = !poll.finished && !poll.future_poll;
   const [activeTab, setActiveTab] = useState<TabId>(
     canVote ? 'vote' : 'results',
@@ -168,15 +170,27 @@ const PollDetails = ({
   const [confirmingText, setConfirmingText] = useState(false);
 
   const submitCheck = buildVotePayload(poll.poll_type, draft);
+  const ballotLockedNoRevote = isVoteSubmitBlocked(poll);
 
   const doSubmit = () => {
-    if (!submitCheck.ready || data.ui_busy) return;
+    if (
+      ballotLockedNoRevote ||
+      !submitCheck.ready ||
+      data.ui_busy ||
+      interactionLocked
+    )
+      return;
     act('vote', { poll_ref: poll.ref, ...submitCheck.payload });
     setConfirmingText(false);
   };
 
   const handleSubmitClick = () => {
-    if (!submitCheck.ready || interactionLocked) return;
+    if (
+      ballotLockedNoRevote ||
+      !submitCheck.ready ||
+      interactionLocked
+    )
+      return;
     if (poll.poll_type === 'TEXT' && !confirmingText) {
       setConfirmingText(true);
       return;
@@ -200,22 +214,31 @@ const PollDetails = ({
               )}
             </Stack.Item>
             <Stack.Item>
-              {poll.finished ? (
-                <Box color="bad">
-                  <Icon name="lock" /> Завершён
-                </Box>
-              ) : poll.future_poll ? (
-                <Box color="average">
-                  <Icon name="hourglass-start" />{' '}
-                  {poll.start_datetime
-                    ? `Старт: ${poll.start_datetime}`
-                    : 'Ещё не начался'}
-                </Box>
-              ) : (
-                <Box color="good">
-                  <Icon name="clock" /> Активен
-                </Box>
-              )}
+              <Stack vertical align="flex-end">
+                <Stack.Item>
+                  {poll.finished ? (
+                    <Box color="bad">
+                      <Icon name="lock" /> Завершён
+                    </Box>
+                  ) : poll.future_poll ? (
+                    <Box color="average">
+                      <Icon name="hourglass-start" />{' '}
+                      {poll.start_datetime
+                        ? `Старт: ${poll.start_datetime}`
+                        : 'Ещё не начался'}
+                    </Box>
+                  ) : (
+                    <Box color="good">
+                      <Icon name="clock" /> Активен
+                    </Box>
+                  )}
+                </Stack.Item>
+                <Stack.Item>
+                  <Box color="label" fontSize={0.85} mt={0.5} preserveWhitespace>
+                    Автор: {poll.created_by ?? 'не указано'}
+                  </Box>
+                </Stack.Item>
+              </Stack>
             </Stack.Item>
           </Stack>
         </Section>
@@ -262,11 +285,11 @@ const PollDetails = ({
               </Box>
             )
           ) : (
-            <ResultsTab poll={poll} />
+            <ResultsTab poll={poll} isPollster={isPollster} />
           )}
         </Section>
       </Stack.Item>
-      {activeTab === 'vote' && canVote && (
+      {activeTab === 'vote' && canVote && !ballotLockedNoRevote && (
         <Stack.Item>
           <Section>
             <Stack vertical>
@@ -299,17 +322,28 @@ const PollDetails = ({
                     <Button
                       icon={confirmingText ? 'check' : 'paper-plane'}
                       color={submitCheck.ready ? 'good' : 'default'}
+                      disabled={
+                        interactionLocked ||
+                        data.ui_busy ||
+                        ballotLockedNoRevote ||
+                        !submitCheck.ready
+                      }
                       style={
-                        !submitCheck.ready || interactionLocked
+                        !submitCheck.ready ||
+                        interactionLocked ||
+                        ballotLockedNoRevote ||
+                        data.ui_busy
                           ? uiLockedGreystyle
                           : undefined
                       }
                       tooltip={
-                        !submitCheck.ready && 'reason' in submitCheck
-                          ? submitCheck.reason
-                          : interactionLocked
-                            ? 'Ожидание ответа сервера…'
-                            : undefined
+                        ballotLockedNoRevote
+                          ? undefined
+                          : !submitCheck.ready && 'reason' in submitCheck
+                            ? submitCheck.reason
+                            : interactionLocked || data.ui_busy
+                              ? 'Ожидание ответа сервера…'
+                              : undefined
                       }
                       onClick={handleSubmitClick}
                     >

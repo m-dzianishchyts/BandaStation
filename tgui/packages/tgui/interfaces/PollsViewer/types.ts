@@ -62,6 +62,7 @@ export type RatingOptionResult = {
 };
 
 export type TextReply = {
+  id?: number;
   text: string;
   datetime: string;
 };
@@ -72,6 +73,7 @@ export type PollResults = {
   total_votes_sum?: number;
   options?: OptionResult[] | RatingOptionResult[];
   replies?: TextReply[];
+  respondent_ckeys?: string[];
   note?: string;
 };
 
@@ -80,6 +82,7 @@ export type SelectedPoll = {
   ref: string;
   question: string;
   subtitle: string | null;
+  created_by?: string | null;
   poll_type: PollType;
   start_datetime: string | null;
   end_datetime: string;

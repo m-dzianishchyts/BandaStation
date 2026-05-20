@@ -138,16 +138,23 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 	if(!SSdbcore.Connect())
 		return null
 	var/datum/db_query/query = SSdbcore.NewQuery(
-		"SELECT id, polltype, starttime, endtime, question, subtitle, adminonly, multiplechoiceoptions, dontshow, allow_revoting FROM [format_table_name("poll_question")] WHERE id = :poll_id AND deleted = 0",
+		{"SELECT q.id, q.polltype, q.starttime, q.endtime, q.question, q.subtitle, q.adminonly,
+			q.multiplechoiceoptions, q.dontshow, q.allow_revoting,
+			IF(q.polltype='TEXT',
+				(SELECT COUNT(ckey) FROM [format_table_name("poll_textreply")] AS t WHERE t.pollid = q.id AND t.deleted = 0),
+				(SELECT COUNT(DISTINCT ckey) FROM [format_table_name("poll_vote")] AS v WHERE v.pollid = q.id AND v.deleted = 0)),
+			IFNULL((SELECT byond_key FROM [format_table_name("player")] AS p WHERE p.ckey = q.createdby_ckey), q.createdby_ckey),
+			IF(q.starttime > NOW(), 1, 0)
+			FROM [format_table_name("poll_question")] AS q WHERE q.id = :poll_id AND q.deleted = 0"},
 		list("poll_id" = poll_id)
 	)
 	if(!query.warn_execute() || !query.NextRow())
 		qdel(query)
 		return null
-	// Build a full datum without attaching it to live poll flow
 	var/datum/poll_question/poll = new(
 		query.item[1], query.item[2], query.item[3], query.item[4], query.item[5], query.item[6],
-		query.item[7], query.item[8], query.item[9], query.item[10], 0, null, 0, TRUE
+		query.item[7], query.item[8], query.item[9], query.item[10], query.item[11], query.item[12],
+		query.item[13], TRUE
 	)
 	qdel(query)
 	// Remove from GLOB.polls, as it registers itself automatically
@@ -248,6 +255,7 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 		"dont_show" = !!poll.dont_show,
 		"options_allowed" = poll.options_allowed,
 		"total_votes" = poll.poll_votes,
+		"created_by" = poll.created_by ? "[poll.created_by]" : null,
 	)
 	if(is_archived_cached_poll(poll))
 		data["ref"] = "archived:[poll.poll_id]"
@@ -269,13 +277,41 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 	data["finished"] = is_poll_finished(poll)
 	data["can_view_results"] = can_view_results(poll, user)
 	data["user_votes"] = get_user_votes(poll, user.client?.ckey)
-	data["results"] = data["can_view_results"] ? calculate_poll_results(poll) : null
+	var/admin_vote_tools = check_rights_for(user.client, R_POLL)
+	data["results"] = data["can_view_results"] ? calculate_poll_results(poll, admin_vote_tools) : null
 
 	return data
 
-/**
- * Rebuilds lobby title so the polls button badge matches DB vote state.
- */
+/// Syncs datum vote counter with DB.
+/datum/polls_viewer/proc/refresh_poll_datum_vote_count(datum/poll_question/poll)
+	if(!poll?.poll_id || !SSdbcore.Connect())
+		return
+	var/count_sql = poll.poll_type == POLLTYPE_TEXT ? {"
+			SELECT COUNT(ckey) FROM [format_table_name("poll_textreply")] WHERE pollid = :poll_id AND deleted = 0
+			"} : {"
+			SELECT COUNT(DISTINCT ckey) FROM [format_table_name("poll_vote")] WHERE pollid = :poll_id AND deleted = 0
+			"}
+	var/datum/db_query/query_count = SSdbcore.NewQuery(count_sql, list("poll_id" = poll.poll_id))
+	if(!query_count.warn_execute())
+		qdel(query_count)
+		return
+	if(query_count.NextRow())
+		poll.poll_votes = text2num(query_count.item[1]) || 0
+	qdel(query_count)
+
+/// Resolves a poll from lobby UI ref live datum ref or archived id for pollsters viewing DB cache.
+/datum/polls_viewer/proc/resolve_poll_for_ui(ref_str, mob/user)
+	if(!ref_str || !user?.client)
+		return null
+	if(findtext(ref_str, "archived:") == 1)
+		if(!check_rights_for(user.client, R_POLL))
+			return null
+		var/poll_id = text2num(copytext(ref_str, length("archived:") + 1))
+		return poll_id ? ensure_archived_poll_loaded(poll_id) : null
+	return locate(ref_str) in GLOB.polls
+
+
+/// Rebuilds lobby title so the polls button badge matches DB vote state.
 /datum/polls_viewer/proc/refresh_title_screen_poll_button(mob/user)
 	if(!user?.client || !isnewplayer(user))
 		return

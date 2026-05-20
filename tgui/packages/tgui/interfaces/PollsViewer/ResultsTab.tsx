@@ -1,5 +1,6 @@
 import {
   Box,
+  Button,
   Icon,
   NoticeBox,
   ProgressBar,
@@ -8,7 +9,9 @@ import {
   Table,
 } from 'tgui-core/components';
 
+import { useBackend } from '../../backend';
 import type {
+  Data,
   OptionResult,
   PollResults,
   RatingOptionResult,
@@ -18,9 +21,10 @@ import type {
 
 type Props = {
   poll: SelectedPoll;
+  isPollster: boolean;
 };
 
-export const ResultsTab = ({ poll }: Props) => {
+export const ResultsTab = ({ poll, isPollster }: Props) => {
   if (!poll.can_view_results) {
     return (
       <NoticeBox>
@@ -33,29 +37,111 @@ export const ResultsTab = ({ poll }: Props) => {
     return <NoticeBox>Нет данных по результатам.</NoticeBox>;
   }
 
-  return <ResultsContent results={poll.results} />;
+  return (
+    <ResultsContent
+      pollRef={poll.ref}
+      results={poll.results}
+      isPollster={isPollster}
+    />
+  );
 };
 
-const ResultsContent = ({ results }: { results: PollResults }) => {
+const ResultsContent = ({
+  pollRef,
+  results,
+  isPollster,
+}: {
+  pollRef: string;
+  results: PollResults;
+  isPollster: boolean;
+}) => {
   switch (results.type) {
     case 'OPTION':
     case 'MULTICHOICE':
     case 'IRV':
-      return <OptionResults results={results} />;
+      return (
+        <OptionResults
+          pollRef={pollRef}
+          results={results}
+          isPollster={isPollster}
+        />
+      );
     case 'NUMVAL':
-      return <RatingResults results={results} />;
+      return (
+        <RatingResults
+          pollRef={pollRef}
+          results={results}
+          isPollster={isPollster}
+        />
+      );
     case 'TEXT':
-      return <TextResults results={results} />;
+      return (
+        <TextResults
+          pollRef={pollRef}
+          results={results}
+          isPollster={isPollster}
+        />
+      );
     default:
       return <NoticeBox danger>Неизвестный тип опроса.</NoticeBox>;
   }
 };
 
-const OptionResults = ({ results }: { results: PollResults }) => {
+const RespondentAdminPanel = ({
+  pollRef,
+  ckeys,
+}: {
+  pollRef: string;
+  ckeys: string[];
+}) => {
+  const { act } = useBackend<Data>();
+  if (!ckeys.length) return null;
+
+  return (
+    <Section title="Удаление голосов" color="grey">
+      <Box color="label" mb={1}>
+        Снимает все записи игрока в этом опросе.
+      </Box>
+      <Stack vertical>
+        {ckeys.map((ckey) => (
+          <Stack.Item key={ckey}>
+            <Stack align="center" justify="space-between">
+              <Box fontFamily="monospace" preserveWhitespace>
+                {ckey}
+              </Box>
+              <Button.Confirm
+                icon="eraser"
+                color="bad"
+                confirmContent={`Снять все записи с ${ckey} в этом опросе?`}
+                onClick={() =>
+                  act('admin_delete_respondent_votes', {
+                    poll_ref: pollRef,
+                    target_ckey: ckey,
+                  })
+                }
+              >
+                Удалить голос
+              </Button.Confirm>
+            </Stack>
+          </Stack.Item>
+        ))}
+      </Stack>
+    </Section>
+  );
+};
+
+const OptionResults = ({
+  pollRef,
+  results,
+  isPollster,
+}: {
+  pollRef: string;
+  results: PollResults;
+  isPollster: boolean;
+}) => {
   const options = (results.options ?? []) as OptionResult[];
   const totalVoters = results.total_voters ?? 0;
-  // Для MULTI нормализуем по сумме всех голосов, чтобы опции сравнивались между собой
-  // (иначе у одного голосующего с N выборами все опции показывали бы 100%).
+  // For MULTI, normalize by the total sum of votes so options can be compared against each other
   const denominator =
     results.type === 'MULTICHOICE'
       ? (results.total_votes_sum ?? 0) || 1
@@ -115,12 +201,30 @@ const OptionResults = ({ results }: { results: PollResults }) => {
           </Table>
         </Section>
       </Stack.Item>
+      <Stack.Item>
+        {!!isPollster && (
+          <RespondentAdminPanel
+            pollRef={pollRef}
+            ckeys={results.respondent_ckeys ?? []}
+          />
+        )}
+      </Stack.Item>
     </Stack>
   );
 };
 
-const RatingResults = ({ results }: { results: PollResults }) => {
+const RatingResults = ({
+  pollRef,
+  results,
+  isPollster,
+}: {
+  pollRef: string;
+  results: PollResults;
+  isPollster: boolean;
+}) => {
   const options = (results.options ?? []) as RatingOptionResult[];
+
+  const respondKeys = results.respondent_ckeys ?? [];
 
   return (
     <Stack vertical>
@@ -164,11 +268,24 @@ const RatingResults = ({ results }: { results: PollResults }) => {
           </Section>
         </Stack.Item>
       ))}
+      <Stack.Item>
+        {!!isPollster && (
+          <RespondentAdminPanel pollRef={pollRef} ckeys={respondKeys} />
+        )}
+      </Stack.Item>
     </Stack>
   );
 };
 
-const TextResults = ({ results }: { results: PollResults }) => {
+const TextResults = ({
+  pollRef,
+  results,
+  isPollster,
+}: {
+  pollRef: string;
+  results: PollResults;
+  isPollster: boolean;
+}) => {
   const replies = results.replies ?? [];
 
   if (replies.length === 0) {
@@ -178,13 +295,17 @@ const TextResults = ({ results }: { results: PollResults }) => {
   return (
     <Section>
       <Box color="label" mb={1}>
-        <Icon name="user-secret" /> Все ответы анонимны. Всего ответов:{' '}
-        {replies.length}
+        <Icon name="user-secret" /> Ответы видны без указания автора. Всего
+        ответов: {replies.length}
       </Box>
       <Stack vertical>
         {replies.map((reply, index) => (
-          <Stack.Item key={index}>
-            <ReplyCard reply={reply} />
+          <Stack.Item key={reply.id ?? index}>
+            <ReplyCard
+              isPollster={isPollster}
+              pollRef={pollRef}
+              reply={reply}
+            />
           </Stack.Item>
         ))}
       </Stack>
@@ -192,13 +313,49 @@ const TextResults = ({ results }: { results: PollResults }) => {
   );
 };
 
-const ReplyCard = ({ reply }: { reply: TextReply }) => {
+const ReplyCard = ({
+  reply,
+  isPollster,
+  pollRef,
+}: {
+  reply: TextReply;
+  isPollster: boolean;
+  pollRef: string;
+}) => {
+  const { act } = useBackend<Data>();
+  const showDelete =
+    !!isPollster && reply.id !== undefined && reply.id !== null;
+
   return (
     <Section>
-      <Box color="label" mb={0.5}>
-        <Icon name="clock" /> {reply.datetime}
+      <Stack align="baseline" justify="space-between" gap={1} mb={0.5}>
+        <Stack.Item grow>
+          <Box color="label">
+            <Icon name="clock" /> {reply.datetime}
+          </Box>
+        </Stack.Item>
+        {showDelete ? (
+          <Stack.Item shrink={0}>
+            <Button.Confirm
+              icon="eraser"
+              color="bad"
+              confirmIcon="triangle-exclamation"
+              confirmContent="Удалить этот ответ? Действие необратимо."
+              onClick={() =>
+                act('admin_delete_text_reply', {
+                  poll_ref: pollRef,
+                  reply_id: reply.id,
+                })
+              }
+            >
+              Удалить
+            </Button.Confirm>
+          </Stack.Item>
+        ) : null}
+      </Stack>
+      <Box preserveWhitespace mt={showDelete ? 0.5 : 0}>
+        {reply.text}
       </Box>
-      <Box preserveWhitespace>{reply.text}</Box>
     </Section>
   );
 };
