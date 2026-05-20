@@ -43,7 +43,11 @@ export const PollsViewer = () => {
       <Window.Content>
         <Stack fill>
           {!listCollapsed && (
-            <Stack.Item basis="360px" shrink={0}>
+            <Stack.Item
+              basis="23%"
+              grow
+              style={{ minWidth: '180px', maxWidth: '320px' }}
+            >
               <PollList
                 selectedRef={activeRef}
                 onSelect={(ref) => setPendingRef(ref)}
@@ -110,13 +114,14 @@ const EmptyState = () => (
 
 const LoadingState = () => (
   <Section fill>
-    <div className="PollsViewer__LoadingOverlay">
-      <Icon
-        name="spinner"
-        className="PollsViewer__LoadingOverlay--Spinner"
-      />
-      <Box>Загрузка опроса...</Box>
-    </div>
+    <Stack fill vertical align="center" justify="center">
+      <Stack.Item>
+        <Icon name="spinner" spin size={3} color="label" />
+      </Stack.Item>
+      <Stack.Item>
+        <Box color="label">Загрузка опроса...</Box>
+      </Stack.Item>
+    </Stack>
   </Section>
 );
 

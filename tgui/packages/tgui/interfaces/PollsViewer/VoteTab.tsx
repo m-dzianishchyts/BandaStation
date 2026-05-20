@@ -1,5 +1,4 @@
-import { Box, Icon, NoticeBox, Section, Slider, Stack, TextArea } from 'tgui-core/components';
-import { classes } from 'tgui-core/react';
+import { Box, Button, Icon, NoticeBox, Section, Slider, Stack, TextArea } from 'tgui-core/components';
 
 import type { PollOption, SelectedPoll } from './types';
 import type { VoteDraft } from './voteDraft';
@@ -340,23 +339,27 @@ const ChoiceRow = ({
   label,
   onClick,
 }: ChoiceRowProps) => {
+  const indicatorIcon =
+    kind === 'radio'
+      ? selected
+        ? 'dot-circle'
+        : 'circle'
+      : selected
+        ? 'square-check'
+        : 'square';
+
   return (
-    <div
-      className={classes([
-        'PollsViewer__Choice',
-        selected && 'PollsViewer__Choice--selected',
-        disabled && 'PollsViewer__Choice--disabled',
-      ])}
+    <Button
+      fluid
+      textAlign="left"
+      selected={selected}
+      disabled={disabled}
+      color={selected ? 'good' : 'default'}
+      icon={indicatorIcon}
       onClick={disabled ? undefined : onClick}
+      tooltip={disabled ? 'Достигнут лимит вариантов' : undefined}
     >
-      <div
-        className={classes([
-          'PollsViewer__Choice--Indicator',
-          kind,
-          selected && 'selected',
-        ])}
-      />
-      <div className="PollsViewer__Choice--Label">{label}</div>
-    </div>
+      {label}
+    </Button>
   );
 };
