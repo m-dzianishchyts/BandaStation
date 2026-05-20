@@ -442,6 +442,8 @@
 // BANDASTATION MOD START: Announce new polls to players in chat
 	if(new_poll && !admin_only && !future_poll)
 		to_chat(world, span_ooc("Новый опрос: <b>[html_encode(question)]</b> - проверьте меню «Текущие опросы» в лобби."))
+	if(new_poll)
+		SStitle.show_title_screen_to_all_new_players()
 // BANDASTATION MOD END
 
 /**
