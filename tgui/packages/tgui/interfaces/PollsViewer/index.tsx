@@ -32,10 +32,19 @@ export const PollsViewer = () => {
 
   // change loading indicator when backend sent data
   useEffect(() => {
-    if (selected_poll && selected_poll.ref === pendingRef) {
+    if (!selected_poll || !pendingRef) return;
+    if (selected_poll.ref === pendingRef) {
+      setPendingRef(null);
+      return;
+    }
+    // Keep pending until id matches
+    if (
+      pendingRef.startsWith('archived:') &&
+      Number(pendingRef.slice('archived:'.length)) === selected_poll.id
+    ) {
       setPendingRef(null);
     }
-  }, [selected_poll?.ref, pendingRef]);
+  }, [selected_poll, pendingRef]);
 
   const activeRef = selected_poll?.ref ?? pendingRef ?? undefined;
   const awaitingSelectionDetail = Boolean(

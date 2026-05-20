@@ -249,6 +249,8 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 		"options_allowed" = poll.options_allowed,
 		"total_votes" = poll.poll_votes,
 	)
+	if(is_archived_cached_poll(poll))
+		data["ref"] = "archived:[poll.poll_id]"
 
 	var/list/options_data = list()
 	for(var/datum/poll_option/option as anything in poll.options)
