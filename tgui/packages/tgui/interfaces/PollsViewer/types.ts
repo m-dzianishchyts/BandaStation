@@ -8,7 +8,7 @@ export type PollBrief = {
   question: string;
   subtitle: string | null;
   poll_type: PollType;
-  start_datetime: string;
+  start_datetime: string | null;
   end_datetime: string;
   voted: BooleanLike;
   allow_revoting: BooleanLike;
@@ -81,8 +81,9 @@ export type SelectedPoll = {
   question: string;
   subtitle: string | null;
   poll_type: PollType;
-  start_datetime: string;
+  start_datetime: string | null;
   end_datetime: string;
+  future_poll?: BooleanLike;
   allow_revoting: BooleanLike;
   dont_show: BooleanLike;
   options_allowed: number | null;

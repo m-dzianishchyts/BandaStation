@@ -206,6 +206,13 @@ const PollCard = ({
                         </Tooltip>
                       </Stack.Item>
                     )}
+                    {!!poll.future_poll && !poll.finished && (
+                      <Stack.Item>
+                        <Tooltip content="Опрос ещё не начался - показано время старта">
+                          <Icon name="hourglass-start" color="average" />
+                        </Tooltip>
+                      </Stack.Item>
+                    )}
                     {!!poll.voted && (
                       <Stack.Item>
                         <Tooltip content="Ваш голос учтён">
@@ -228,7 +235,11 @@ const PollCard = ({
                 <Icon name="calendar-day" />{' '}
                 {poll.finished
                   ? `завершён ${poll.end_datetime}`
-                  : `до ${poll.end_datetime}`}
+                  : poll.future_poll
+                    ? poll.start_datetime
+                      ? `старт ${poll.start_datetime}`
+                      : 'ещё не начался'
+                    : `до ${poll.end_datetime}`}
               </Box>
             </Stack.Item>
           </Stack>

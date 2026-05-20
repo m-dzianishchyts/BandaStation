@@ -145,7 +145,7 @@ const PollDetails = ({
   interactionLocked: boolean;
 }) => {
   const { act, data } = useBackend<Data>();
-  const canVote = !poll.finished;
+  const canVote = !poll.finished && !poll.future_poll;
   const [activeTab, setActiveTab] = useState<TabId>(
     canVote ? 'vote' : 'results',
   );
@@ -195,6 +195,13 @@ const PollDetails = ({
                 <Box color="bad">
                   <Icon name="lock" /> Завершён
                 </Box>
+              ) : poll.future_poll ? (
+                <Box color="average">
+                  <Icon name="hourglass-start" />{' '}
+                  {poll.start_datetime
+                    ? `Старт: ${poll.start_datetime}`
+                    : 'Ещё не начался'}
+                </Box>
               ) : (
                 <Box color="good">
                   <Icon name="clock" /> Активен
@@ -232,6 +239,13 @@ const PollDetails = ({
                 setDraft={setDraft}
                 controlsLocked={interactionLocked}
               />
+            ) : poll.future_poll ? (
+              <Box color="label" textAlign="center" mt={2}>
+                <Icon name="hourglass-start" />{' '}
+                {poll.start_datetime
+                  ? `Опрос ещё не начался. Старт: ${poll.start_datetime}`
+                  : 'Опрос ещё не начался. Время старта не указано.'}
+              </Box>
             ) : (
               <Box color="label" textAlign="center" mt={2}>
                 <Icon name="hourglass-end" /> Опрос завершён, голосование

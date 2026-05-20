@@ -243,6 +243,7 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 		"poll_type" = poll.poll_type,
 		"start_datetime" = poll.start_datetime,
 		"end_datetime" = poll.end_datetime,
+		"future_poll" = !!poll.future_poll,
 		"allow_revoting" = !!poll.allow_revoting,
 		"dont_show" = !!poll.dont_show,
 		"options_allowed" = poll.options_allowed,
