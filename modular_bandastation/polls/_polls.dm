@@ -1,7 +1,7 @@
 /datum/modpack/polls
-	name = "Современный UI для опросов"
+	name = "TGUI polls"
 	desc = "TGUI окно для просмотра опросов, голосования и отображения результатов."
-	author = "BandaStation"
+	author = "Maxiemar"
 
 /datum/modpack/polls/pre_initialize()
 	. = ..()
