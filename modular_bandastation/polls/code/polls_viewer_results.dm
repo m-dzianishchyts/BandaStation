@@ -1,5 +1,5 @@
 /**
- * Подсчёт результатов опроса. Логика повторяет Statbus Tally-сервисы.
+ * Poll results calculation, mirrors Statbus.
  */
 /datum/polls_viewer/proc/calculate_poll_results(datum/poll_question/poll)
 	if(!SSdbcore.Connect())
@@ -22,8 +22,8 @@
 	return null
 
 /**
- * OPTION: уникальные голоса на option_id, сортируем по убыванию.
- * Каждый ckey учитывается один раз (на случай, если в БД остались дубли).
+ * OPTION: unique votes by option_id, sorted descending.
+ * Each ckey is counted once
  */
 /datum/polls_viewer/proc/tally_option_poll(datum/poll_question/poll)
 	var/list/result = list(
@@ -65,7 +65,8 @@
 	return result
 
 /**
- * MULTI: каждое сочетание ckey+option = 1 голос. Общее число голосующих — DISTINCT ckey.
+ * MULTI: each ckey+option pair counts as one vote.
+ * Total voter count is DISTINCT ckey
  */
 /datum/polls_viewer/proc/tally_multi_poll(datum/poll_question/poll)
 	var/list/result = list(
@@ -112,7 +113,7 @@
 	return result
 
 /**
- * RATING: для каждой опции — распределение голосов по значениям rating (от min до max).
+ * RATING: vote distribution per option by rating value (min..max)
  */
 /datum/polls_viewer/proc/tally_rating_poll(datum/poll_question/poll)
 	var/list/result = list(
@@ -124,7 +125,8 @@
 		var/list/ratings_dist = list()
 		var/min_v = option.min_val
 		var/max_v = option.max_val
-		// Инициализируем все возможные значения нулями
+
+		// Initialize all rating buckets with zero values
 		for(var/i in min_v to max_v)
 			ratings_dist["[i]"] = 0
 
@@ -167,7 +169,8 @@
 	return result
 
 /**
- * TEXT: анонимный список ответов (ckey не передаётся в UI, чтобы обеспечить полную анонимность).
+ * TEXT: anonymous list of replies.
+ * ckey is intentionally not exposed to UI.
  */
 /datum/polls_viewer/proc/tally_text_poll(datum/poll_question/poll)
 	var/list/result = list(
@@ -175,7 +178,7 @@
 		"replies" = list(),
 	)
 
-	// ckey из результатов намеренно не передаётся, чтобы не деанонимизировать игроков ни для кого.
+	// ckey is intentionally omitted
 	var/datum/db_query/query = SSdbcore.NewQuery(
 		"SELECT replytext, datetime FROM [format_table_name("poll_textreply")] WHERE pollid = :poll_id AND deleted = 0 ORDER BY datetime DESC",
 		list("poll_id" = poll.poll_id)
@@ -193,6 +196,6 @@
 
 	return result
 
-/// Сравнение для сортировки опций по убыванию голосов.
+/// Comparator for descending vote sort.
 /proc/cmp_poll_result_votes_desc(list/a, list/b)
 	return b["votes"] - a["votes"]

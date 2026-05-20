@@ -1,6 +1,3 @@
-/**
- * Обработка действий пользователя из TGUI.
- */
 /datum/polls_viewer/ui_act(action, list/params, datum/tgui/ui, datum/ui_state/state)
 	. = ..()
 	if(.)
@@ -24,9 +21,7 @@
 				poll = locate(ref_str) in GLOB.polls
 			if(!poll)
 				return TRUE
-			if(poll.admin_only && !user.client.holder)
-				return TRUE
-			if(poll.future_poll && !user.client.holder)
+			if((poll.admin_only || poll.future_poll) && !user.client.holder)
 				return TRUE
 			selected_poll_by_ckey[ckey] = poll
 			ui.send_full_update()
@@ -42,7 +37,9 @@
 			if(!poll)
 				return TRUE
 			handle_vote(poll, user, params)
-			ui.send_full_update() // обновить результаты и voted-флаги
+
+			// Refresh results and voted flags
+			ui.send_full_update()
 			return TRUE
 
 		if("refresh")
@@ -59,8 +56,8 @@
 			return TRUE
 
 /**
- * Обработка голоса с TGUI. Адаптер над существующими процедурами голосования.
- * Собирает href_list в формате, который ждут vote_on_poll_* процедуры, и передаёт им.
+ * Handles vote payload from TGUI.
+ * Adapts incoming params to href_list format expected by vote_on_poll_* procs.
  */
 /datum/polls_viewer/proc/handle_vote(datum/poll_question/poll, mob/user, list/params)
 	if(!isnewplayer(user))
@@ -87,7 +84,7 @@
 			var/list/ratings = params["ratings"]
 			if(!islist(ratings) || !length(ratings))
 				return
-			// vote_on_poll_rating() делает href_list.Cut(1, 3), так что первые 2 элемента -- служебные.
+			// vote_on_poll_rating() does href_list.Cut(1, 3), so first two keys are service keys
 			href_list["src"] = "tgui"
 			href_list["votepollref"] = params["poll_ref"]
 			for(var/option_ref in ratings)
@@ -100,7 +97,7 @@
 			var/list/selected = params["option_refs"]
 			if(!islist(selected) || !length(selected))
 				return
-			// vote_on_poll_multi() делает href_list.Cut(1, 3), первые 2 элемента -- служебные.
+			// vote_on_poll_multi() does href_list.Cut(1, 3), first two keys are service keys
 			href_list["src"] = "tgui"
 			href_list["votepollref"] = params["poll_ref"]
 			for(var/option_ref in selected)

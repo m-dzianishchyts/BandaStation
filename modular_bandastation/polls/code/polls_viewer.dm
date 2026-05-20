@@ -1,12 +1,9 @@
-/**
- * Современный TGUI-просмотрщик опросов. Один общий datum на весь сервер.
- */
 GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 
 /datum/polls_viewer
-	/// Текущий выбранный опрос для каждого пользователя: ckey -> datum/poll_question
+	/// Currently selected poll per user
 	var/list/selected_poll_by_ckey = list()
-	/// Кэш завершённых опросов, загружаемых из БД по запросу админов: poll_id -> datum/poll_question
+	/// Finished polls loaded from DB for admin requests
 	var/list/archived_polls_cache = list()
 
 /datum/polls_viewer/ui_state(mob/user)
@@ -23,8 +20,6 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 		ui = new(user, src, "PollsViewer")
 		ui.open()
 
-/// ui_data обновляется каждый тик TGUI и должен быть максимально легковесным.
-/// Все тяжёлые данные уходят в ui_static_data и обновляются вручную через update_static_data().
 /datum/polls_viewer/ui_data(mob/user)
 	return list()
 
@@ -33,7 +28,7 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 	var/ckey = user.client?.ckey
 	var/is_pollster = check_rights_for(user.client, R_POLL)
 
-	// Единоразово загружаем, в каких опросах пользователь уже участвовал.
+	// Load poll participation once for this static payload build
 	var/list/voted_poll_ids = get_voted_poll_ids(ckey)
 
 	var/list/polls_data = list()
@@ -59,7 +54,7 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 			"total_votes" = poll.poll_votes,
 		))
 
-	// Админам дополнительно подгружаем карточки архивных (завершённых) опросов напрямую из БД.
+	// Admins get brief cards for archived polls
 	if(is_pollster)
 		for(var/list/archived in load_archived_polls_brief())
 			polls_data += list(archived)
@@ -69,16 +64,13 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 	data["ckey"] = ckey
 
 	var/datum/poll_question/selected = selected_poll_by_ckey[ckey]
-	if(selected)
-		data["selected_poll"] = build_selected_poll_data(selected, user)
-	else
-		data["selected_poll"] = null
+	data["selected_poll"] = selected ? build_selected_poll_data(selected, user) : null
 
 	return data
 
 /**
- * Загружает brief-карточки завершённых опросов для админского архива.
- * Опции и полные данные подгружаются только при выборе конкретного опроса (см. ensure_archived_poll_loaded).
+ * Loads brief cards for finished polls for admin archive view.
+ * Full data is loaded only for selected poll.
  */
 /datum/polls_viewer/proc/load_archived_polls_brief()
 	var/list/result = list()
@@ -117,11 +109,13 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 	return result
 
 /**
- * Гарантирует, что архивный опрос загружен в кэш. Возвращает datum/poll_question или null.
+ * Ensures archived poll is loaded into cache.
+ * Returns datum/poll_question or null.
  */
 /datum/polls_viewer/proc/ensure_archived_poll_loaded(poll_id)
-	if(archived_polls_cache["[poll_id]"])
-		return archived_polls_cache["[poll_id]"]
+	var/cache_key = "[poll_id]"
+	if(archived_polls_cache[cache_key])
+		return archived_polls_cache[cache_key]
 	if(!SSdbcore.Connect())
 		return null
 	var/datum/db_query/query = SSdbcore.NewQuery(
@@ -131,13 +125,13 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 	if(!query.warn_execute() || !query.NextRow())
 		qdel(query)
 		return null
-	// Создаём полноценный datum (не добавляя в GLOB.polls, чтобы не ломать игровую логику).
+	// Build a full datum without attaching it to live poll flow
 	var/datum/poll_question/poll = new(
 		query.item[1], query.item[2], query.item[3], query.item[4], query.item[5], query.item[6],
 		query.item[7], query.item[8], query.item[9], query.item[10], 0, null, 0, TRUE
 	)
 	qdel(query)
-	// Убираем из GLOB.polls -- datum сам себя туда добавил в New().
+	// Remove from GLOB.polls, as it registers itself automatically
 	GLOB.polls -= poll
 
 	var/datum/db_query/query_options = SSdbcore.NewQuery(
@@ -153,7 +147,7 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 			poll.options += option
 	qdel(query_options)
 
-	archived_polls_cache["[poll_id]"] = poll
+	archived_polls_cache[cache_key] = poll
 	return poll
 
 /datum/polls_viewer/proc/get_voted_poll_ids(ckey)
@@ -182,19 +176,18 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 	return result
 
 /**
- * Может ли пользователь видеть результаты данного опроса?
- * Админ — всегда. Другие — если опрос закончен либо dont_show = FALSE.
+ * Can this user see poll results?
+ * Admins always can; everyone else only when poll is finished or dont_show is not set.
  */
 /datum/polls_viewer/proc/can_view_results(datum/poll_question/poll, mob/user)
 	if(user.client?.holder)
 		return TRUE
-	// Админы прячут результаты активных опросов при dont_show
 	if(poll.dont_show && !is_poll_finished(poll))
 		return FALSE
 	return TRUE
 
 /**
- * Проверяет, закончен ли опрос по end_datetime.
+ * Checks whether poll is finished based on end_datetime.
  */
 /datum/polls_viewer/proc/is_poll_finished(datum/poll_question/poll)
 	if(!poll.end_datetime)
@@ -208,14 +201,13 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 	if(!query.warn_execute())
 		qdel(query)
 		return FALSE
-	var/finished = FALSE
-	if(query.NextRow())
-		finished = text2num(query.item[1])
+	var/finished = query.NextRow() ? text2num(query.item[1]) : FALSE
 	qdel(query)
 	return finished
 
 /**
- * Собирает полные данные о выбранном опросе: опции, пользовательские голоса, результаты.
+ * Builds full data for selected poll:
+ * options, user votes, and results
  */
 /datum/polls_viewer/proc/build_selected_poll_data(datum/poll_question/poll, mob/user)
 	var/list/data = list(
@@ -249,20 +241,16 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 	data["finished"] = is_poll_finished(poll)
 	data["can_view_results"] = can_view_results(poll, user)
 	data["user_votes"] = get_user_votes(poll, user.client?.ckey)
-
-	if(data["can_view_results"])
-		data["results"] = calculate_poll_results(poll)
-	else
-		data["results"] = null
+	data["results"] = data["can_view_results"] ? calculate_poll_results(poll) : null
 
 	return data
 
 /**
- * Возвращает список текущих голосов пользователя для указанного опроса.
- * Для OPTION/TEXT: список из одного элемента (или 0).
- * Для MULTI: список option_id.
- * Для RATING: ассоциативный список option_id -> rating.
- * Для IRV: упорядоченный список option_id (ранжирование).
+ * Returns current user votes for this poll
+ * OPTION/TEXT: single value payload (or empty)
+ * MULTI: list of option_id values
+ * RATING: associative list option_id -> rating
+ * IRV: deprecated
  */
 /datum/polls_viewer/proc/get_user_votes(datum/poll_question/poll, ckey)
 	if(!ckey || !SSdbcore.Connect())
