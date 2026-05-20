@@ -74,10 +74,11 @@
 		</html>
 	"}
 
-/datum/title_screen/proc/create_button(user, href, text, tooltip, tooltip_position = "right", advanced_classes, enabled = TRUE)
+/datum/title_screen/proc/create_button(user, href, text, tooltip, tooltip_position = "right", advanced_classes, enabled = TRUE, badge_count = 0)
 	return {"
 		<a class="lobby_element lobby-[href] [!enabled ? "disabled" : ""] [advanced_classes]" href='byond://?src=[REF(user)];[href]=1'>
 			<span class="lobby-text">[text]</span>
+			[badge_count > 0 ? "<span class='lobby-poll-badge'>[badge_count]</span>" : ""]
 			[tooltip ? {"
 			<div class="lobby-tooltip" data-position="[tooltip_position]">
 				<span class="lobby-tooltip-content">[tooltip]</span>
@@ -97,10 +98,10 @@
 
 		html += create_button(player, "observe", "Наблюдать")
 		var/unvoted_polls = count_unvoted_polls(player)
-		var/polls_classes = unvoted_polls > 0 ? "has-indicator" : ""
+		var/polls_classes = unvoted_polls > 0 ? "lobby-polls--badged" : ""
 		html += {"
 			[create_button(player, "manifest", "Манифест персонала")]
-			[create_button(player, "polls", "Текущие опросы", tooltip = "Доступно [unvoted_polls] опрос(ов)", advanced_classes = polls_classes)]
+			[create_button(player, "polls", "Текущие опросы", tooltip = unvoted_polls > 0 ? "Доступно опросов: [unvoted_polls]" : "Нет опросов без ответа", advanced_classes = polls_classes, badge_count = unvoted_polls)]
 			<hr>
 			[create_button(player, "character_setup", "Настройка персонажа")]
 			[create_button(player, "settings", "Настройки игры")]
@@ -195,10 +196,17 @@
  * Count unvoted polls available to the player.
  */
 /datum/title_screen/proc/count_unvoted_polls(mob/dead/new_player/player)
+	if(!player?.client?.ckey)
+		return 0
+	var/list/voted_ids = list()
+	if(GLOB.polls_viewer)
+		voted_ids = GLOB.polls_viewer.get_voted_poll_ids(player.client.ckey)
 	var/count = 0
 	for(var/p in GLOB.polls)
 		var/datum/poll_question/poll = p
 		if((poll.admin_only && !player.client.holder) || poll.future_poll)
+			continue
+		if(voted_ids["[poll.poll_id]"])
 			continue
 		count++
 	return count

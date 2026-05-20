@@ -51,7 +51,8 @@
 				end_polls_ui_busy(ckey)
 				ui.send_update(force = TRUE)
 				return TRUE
-			handle_vote(poll, user, params)
+			if(handle_vote(poll, user, params))
+				GLOB.polls_viewer.refresh_title_screen_poll_button(user)
 			end_polls_ui_busy(ckey)
 			ui.send_full_update(force = TRUE, always_instant = TRUE)
 			return TRUE
@@ -80,11 +81,12 @@
 /**
  * Handles vote payload from TGUI.
  * Adapts incoming params to href_list format expected by vote_on_poll_* procs.
+ * Returns TRUE if submission reached vote_on_poll_handler (for lobby badge refresh).
  */
 /datum/polls_viewer/proc/handle_vote(datum/poll_question/poll, mob/user, list/params)
 	if(!isnewplayer(user))
 		to_chat(user, span_warning("Голосовать можно только из лобби."))
-		return
+		return FALSE
 
 	var/mob/dead/new_player/new_player = user
 	var/list/href_list = list()
@@ -93,19 +95,19 @@
 		if(POLLTYPE_OPTION)
 			var/datum/poll_option/option = locate(params["option_ref"]) in poll.options
 			if(!option)
-				return
+				return FALSE
 			href_list["voteoptionref"] = params["option_ref"]
 
 		if(POLLTYPE_TEXT)
 			var/text = params["replytext"]
 			if(!text)
-				return
+				return FALSE
 			href_list["replytext"] = text
 
 		if(POLLTYPE_RATING)
 			var/list/ratings = params["ratings"]
 			if(!islist(ratings) || !length(ratings))
-				return
+				return FALSE
 			// vote_on_poll_rating() does href_list.Cut(1, 3), so first two keys are service keys
 			href_list["src"] = "tgui"
 			href_list["votepollref"] = params["poll_ref"]
@@ -118,7 +120,7 @@
 		if(POLLTYPE_MULTI)
 			var/list/selected = params["option_refs"]
 			if(!islist(selected) || !length(selected))
-				return
+				return FALSE
 			// vote_on_poll_multi() does href_list.Cut(1, 3), first two keys are service keys
 			href_list["src"] = "tgui"
 			href_list["votepollref"] = params["poll_ref"]
@@ -129,3 +131,4 @@
 				href_list[option_ref] = TRUE
 
 	new_player.vote_on_poll_handler(poll, href_list)
+	return TRUE

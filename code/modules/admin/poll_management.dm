@@ -439,6 +439,10 @@
 	else
 		log_admin("[kn] [msg]")
 	message_admins("[kna] [msg]")
+// BANDASTATION MOD START: Announce new polls to players in chat
+	if(new_poll && !admin_only && !future_poll)
+		to_chat(world, span_ooc("Новый опрос: <b>[html_encode(question)]</b> - проверьте меню «Текущие опросы» в лобби."))
+// BANDASTATION MOD END
 
 /**
  * Saves all options of a poll to the database.

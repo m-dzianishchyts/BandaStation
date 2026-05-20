@@ -748,16 +748,34 @@ html.loading {
   content: "\f059";
 }
 
-.lobby-polls.has-indicator .lobby-text:after {
-  content: "";
-  position: absolute;
-  top: -11px;
-  right: -11px;
-  width: 8px;
-  height: 8px;
-  background-color: var(--color-text-good);
-  border-radius: 50%;
-  box-shadow: 0 0 4px var(--color-text-good);
+.lobby_element.lobby-polls.lobby-polls--badged {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  gap: 0.45em;
+}
+
+.lobby_element.lobby-polls.lobby-polls--badged .lobby-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lobby-poll-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.45em;
+  height: 1.45em;
+  padding: 0 0.38em;
+  margin-left: 0.1em;
+  font-size: 0.68em;
+  font-weight: 700;
+  line-height: 1;
+  font-family: sans-serif;
+  color: hsl(15, 8%, 92%);
+  background: hsl(358, 68%, 55%);
+  border-radius: 999px;
 }
 
 .checkbox .lobby-text:before {

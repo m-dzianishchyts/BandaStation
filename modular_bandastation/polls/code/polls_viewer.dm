@@ -274,6 +274,16 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 	return data
 
 /**
+ * Rebuilds lobby title so the polls button badge matches DB vote state.
+ */
+/datum/polls_viewer/proc/refresh_title_screen_poll_button(mob/user)
+	if(!user?.client || !isnewplayer(user))
+		return
+	if(!SStitle?.current_title_screen)
+		return
+	SStitle.show_title_screen_to(user.client)
+
+/**
  * Returns current user votes for this poll
  * OPTION/TEXT: single value payload (or empty)
  * MULTI: list of option_id values
