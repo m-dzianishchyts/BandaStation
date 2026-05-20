@@ -1,5 +1,5 @@
 /datum/modpack/polls
-	name = "TGUI polls"
+	name = "TGUI Polls"
 	desc = "TGUI окно для просмотра опросов, голосования и отображения результатов."
 	author = "Maxiemar"
 

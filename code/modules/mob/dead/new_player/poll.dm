@@ -404,7 +404,7 @@ GLOBAL_PROTECT(poll_options)
 		"poll_id" = sql_poll_id,
 		"option_id" = option.option_id,
 		"ckey" = ckey,
-		"ip" = client.is_localhost() ? "127.0.0.1" : client.address,
+		"ip" = client.is_localhost() ? "127.0.0.1" : client.address, // BANDASTATION MOD: TGUI Polls
 		"admin_rank" = admin_rank,
 	))
 	if(!query_vote_option.warn_execute())
@@ -435,7 +435,7 @@ GLOBAL_PROTECT(poll_options)
 		"vote_id" = vote_id,
 		"poll_id" = sql_poll_id,
 		"ckey" = ckey,
-		"ip" = client.address || "0.0.0.0",
+		"ip" = client.address || "0.0.0.0", // BANDASTATION MOD: TGUI Polls
 		"reply_text" = reply_text,
 		"admin_rank" = admin_rank,
 	))
@@ -481,7 +481,7 @@ GLOBAL_PROTECT(poll_options)
 			"pollid" = sql_poll_id,
 			"optionid" = option.option_id,
 			"ckey" = ckey,
-			"ip" = client.is_localhost() ? "127.0.0.1" : client.address,
+			"ip" = client.is_localhost() ? "127.0.0.1" : client.address, // BANDASTATION MOD: TGUI Polls
 			"adminrank" = admin_rank,
 			"rating" = href_list[h]
 		))
@@ -520,7 +520,7 @@ GLOBAL_PROTECT(poll_options)
 			"pollid" = sql_poll_id,
 			"optionid" = option.option_id,
 			"ckey" = ckey,
-			"ip" = client.address || "0.0.0.0",
+			"ip" = client.address || "0.0.0.0", // BANDASTATION MOD: TGUI Polls
 			"adminrank" = admin_rank
 		))
 	/*with revoting and poll editing possible there can be an edge case where a poll is changed to allow less multiple choice options than a user has already voted on
@@ -564,7 +564,7 @@ GLOBAL_PROTECT(poll_options)
 			"pollid" = sql_poll_id,
 			"optionid" = option.option_id,
 			"ckey" = ckey,
-			"ip" = client.address || "0.0.0.0",
+			"ip" = client.address || "0.0.0.0", // BANDASTATION MOD: TGUI Polls
 			"adminrank" = admin_rank
 		))
 	//IRV results are calculated based on id order, we delete all of a user's votes to avoid potential errors caused by revoting and option editing
