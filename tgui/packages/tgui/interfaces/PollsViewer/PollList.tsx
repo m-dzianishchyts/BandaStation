@@ -12,12 +12,24 @@ import {
 import { useBackend } from '../../backend';
 import type { Data, PollBrief, PollType } from './types';
 
+function formatPollTimestamp(value: string | null | undefined) {
+  if (!value) {
+    return 'не указано';
+  }
+  return new Date(`${value} UTC`).toLocaleString([], {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 const pollTypeLabels: Record<PollType, string> = {
   OPTION: 'Один вариант',
   TEXT: 'Текстовый ответ',
   NUMVAL: 'Рейтинг',
   MULTICHOICE: 'Множественный выбор',
-  IRV: 'Ранжирование',
 };
 
 const pollTypeIcons: Record<PollType, string> = {
@@ -25,14 +37,11 @@ const pollTypeIcons: Record<PollType, string> = {
   TEXT: 'pen',
   NUMVAL: 'star',
   MULTICHOICE: 'list-check',
-  IRV: 'sort',
 };
 
 const uiLockedGreystyle: CSSProperties = {
   opacity: 0.52,
   filter: 'grayscale(0.38)',
-  cursor: 'not-allowed',
-  pointerEvents: 'none',
 };
 
 const POLL_TITLE_IDLE_COLOR = 'hsla(218, 12%, 66%, 0.98)';
@@ -43,16 +52,19 @@ type PollListProps = {
   interactionLocked: boolean;
   onSelect: (ref: string) => void;
   onCollapse: () => void;
+  onOpenPollManagement: () => void;
 };
 
-export const PollList = ({
+export function PollList({
   selectedRef,
   interactionLocked,
   onSelect,
   onCollapse,
-}: PollListProps) => {
+  onOpenPollManagement,
+}: PollListProps) {
   const { act, data } = useBackend<Data>();
-  const { polls, is_pollster } = data;
+  const polls = data.polls ?? [];
+  const is_pollster = data.is_pollster;
 
   return (
     <Section
@@ -71,10 +83,20 @@ export const PollList = ({
               />
             </Stack.Item>
           )}
+          {!!is_pollster && (
+            <Stack.Item>
+              <Button
+                icon="list"
+                tooltip="Открыть менеджер опросов"
+                onClick={() => !interactionLocked && onOpenPollManagement()}
+                style={interactionLocked ? uiLockedGreystyle : undefined}
+              />
+            </Stack.Item>
+          )}
           <Stack.Item>
             <Button
               icon="angles-left"
-              tooltip="Свернуть список"
+              tooltip="Свернуть списочек"
               onClick={onCollapse}
             />
           </Stack.Item>
@@ -101,7 +123,7 @@ export const PollList = ({
   );
 };
 
-const PollCard = ({
+function PollCard({
   poll,
   active,
   interactionLocked,
@@ -111,7 +133,7 @@ const PollCard = ({
   active: boolean;
   interactionLocked: boolean;
   onSelect: (ref: string) => void;
-}) => {
+}) {
   const { act } = useBackend<Data>();
   const isArchived = !!poll.finished;
   const baseBackground = isArchived
@@ -234,12 +256,12 @@ const PollCard = ({
                 {' | '}
                 <Icon name="calendar-day" />{' '}
                 {poll.finished
-                  ? `завершён ${poll.end_datetime}`
+                  ? `завершён ${formatPollTimestamp(poll.end_datetime)}`
                   : poll.future_poll
                     ? poll.start_datetime
-                      ? `старт ${poll.start_datetime}`
+                      ? `старт ${formatPollTimestamp(poll.start_datetime)}`
                       : 'ещё не начался'
-                    : `до ${poll.end_datetime}`}
+                    : `до ${formatPollTimestamp(poll.end_datetime)}`}
               </Box>
             </Stack.Item>
           </Stack>
@@ -247,4 +269,4 @@ const PollCard = ({
       </Stack>
     </Button>
   );
-};
+}

@@ -78,6 +78,12 @@
 			ui.send_full_update(force = TRUE, always_instant = TRUE)
 			return TRUE
 
+		if("open_poll_list_panel")
+			if(!user.client.holder)
+				return TRUE
+			user.client.holder.poll_list_panel()
+			return TRUE
+
 		if("admin_delete_text_reply")
 			return handle_polls_admin_delete_text_reply(ui, user, ckey, params)
 
@@ -135,6 +141,10 @@
 				if(!option)
 					continue
 				href_list[option_ref] = TRUE
+
+		if(POLLTYPE_IRV)
+			to_chat(user, span_warning("Этот тип опроса не поддерживается."))
+			return FALSE
 
 	new_player.vote_on_poll_handler(poll, href_list)
 	return TRUE

@@ -14,11 +14,11 @@ import type { PollOption, SelectedPoll } from './types';
 import type { VoteDraft } from './voteDraft';
 import { isVoteSubmitBlocked } from './voteDraft';
 
+const isString = (value: string | undefined): value is string => value !== undefined;
+
 const rowLockedGreystyle: CSSProperties = {
   opacity: 0.52,
   filter: 'grayscale(0.38)',
-  pointerEvents: 'none',
-  cursor: 'not-allowed',
 };
 
 type VoteTabProps = {
@@ -29,12 +29,12 @@ type VoteTabProps = {
   controlsLocked?: boolean;
 };
 
-export const VoteTab = ({
+export function VoteTab({
   poll,
   draft,
   setDraft,
   controlsLocked = false,
-}: VoteTabProps) => {
+}: VoteTabProps) {
   if (isVoteSubmitBlocked(poll)) {
     return (
       <NoticeBox success>
@@ -79,26 +79,17 @@ export const VoteTab = ({
           controlsLocked={controlsLocked}
         />
       );
-    case 'IRV':
-      return (
-        <VoteIRV
-          poll={poll}
-          draft={draft}
-          setDraft={setDraft}
-          controlsLocked={controlsLocked}
-        />
-      );
     default:
       return <NoticeBox danger>Неизвестный тип опроса.</NoticeBox>;
   }
-};
+}
 
-const VoteOption = ({
+function VoteOption({
   poll,
   draft,
   setDraft,
   controlsLocked = false,
-}: VoteTabProps) => {
+}: VoteTabProps) {
   const selectedRef = draft.optionRef;
 
   return (
@@ -120,13 +111,13 @@ const VoteOption = ({
       })}
     </Stack>
   );
-};
+}
 
-const VoteText = ({
+function VoteText({
   draft,
   setDraft,
   controlsLocked = false,
-}: Omit<VoteTabProps, 'poll'>) => {
+}: Omit<VoteTabProps, 'poll'>) {
   const text = draft.text ?? '';
 
   return (
@@ -158,14 +149,14 @@ const VoteText = ({
       </Stack.Item>
     </Stack>
   );
-};
+}
 
-const VoteRating = ({
+function VoteRating({
   poll,
   draft,
   setDraft,
   controlsLocked = false,
-}: VoteTabProps) => {
+}: VoteTabProps) {
   const ratings = draft.ratings ?? {};
 
   return (
@@ -192,9 +183,9 @@ const VoteRating = ({
       ))}
     </Stack>
   );
-};
+}
 
-const RatingRow = ({
+function RatingRow({
   option,
   value,
   onChange,
@@ -204,7 +195,7 @@ const RatingRow = ({
   value: number;
   onChange: (v: number) => void;
   controlsLocked?: boolean;
-}) => {
+}) {
   const min = option.min_val ?? 1;
   const max = option.max_val ?? 5;
 
@@ -249,18 +240,18 @@ const RatingRow = ({
       </Stack>
     </Section>
   );
-};
+}
 
-const VoteMulti = ({
+function VoteMulti({
   poll,
   draft,
   setDraft,
   controlsLocked = false,
-}: VoteTabProps) => {
+}: VoteTabProps) {
   const selected = draft.optionRefs ?? [];
   const max = poll.options_allowed ?? poll.options.length;
 
-  const toggle = (ref: string) => {
+  function toggle(ref: string) {
     if (controlsLocked) return;
     const has = selected.includes(ref);
     let next: string[];
@@ -271,7 +262,7 @@ const VoteMulti = ({
       next = [...selected, ref];
     }
     setDraft({ ...draft, optionRefs: next });
-  };
+  }
 
   return (
     <Stack vertical>
@@ -298,100 +289,7 @@ const VoteMulti = ({
       })}
     </Stack>
   );
-};
-
-const VoteIRV = ({
-  poll,
-  draft,
-  setDraft,
-  controlsLocked = false,
-}: VoteTabProps) => {
-  const order =
-    draft.ranking ??
-    (poll.user_votes?.ranking?.length
-      ? (poll.user_votes.ranking
-          .map((id) => poll.options.find((o) => o.id === id)?.ref)
-          .filter(Boolean) as string[])
-      : poll.options.map((o) => o.ref));
-
-  const move = (index: number, delta: number) => {
-    if (controlsLocked) return;
-    const target = index + delta;
-    if (target < 0 || target >= order.length) return;
-    const next = [...order];
-    [next[index], next[target]] = [next[target], next[index]];
-    setDraft({ ...draft, ranking: next });
-  };
-
-  const byRef = new Map(poll.options.map((o) => [o.ref, o]));
-
-  return (
-    <Stack vertical>
-      <Stack.Item>
-        <Box color="label">
-          Расположите варианты в порядке предпочтения (наиболее предпочтительные
-          сверху).
-        </Box>
-      </Stack.Item>
-      {order.map((ref, index) => {
-        const option = byRef.get(ref);
-        if (!option) return null;
-        return (
-          <Stack.Item key={ref}>
-            <Section>
-              <Stack align="center">
-                <Stack.Item width="2.5em" textAlign="center" bold>
-                  #{index + 1}
-                </Stack.Item>
-                <Stack.Item grow>{option.text}</Stack.Item>
-                <Stack.Item>
-                  <IrvButton
-                    icon="arrow-up"
-                    disabled={controlsLocked || index === 0}
-                    onClick={() => move(index, -1)}
-                  />
-                </Stack.Item>
-                <Stack.Item>
-                  <IrvButton
-                    icon="arrow-down"
-                    disabled={controlsLocked || index === order.length - 1}
-                    onClick={() => move(index, 1)}
-                  />
-                </Stack.Item>
-              </Stack>
-            </Section>
-          </Stack.Item>
-        );
-      })}
-    </Stack>
-  );
-};
-
-const IrvButton = ({
-  icon,
-  disabled,
-  onClick,
-}: {
-  icon: string;
-  disabled?: boolean;
-  onClick: () => void;
-}) => (
-  <Box
-    as="button"
-    onClick={disabled ? undefined : onClick}
-    style={{
-      background: 'transparent',
-      border: '1px solid var(--color-label)',
-      color: 'inherit',
-      borderRadius: '4px',
-      padding: '4px 8px',
-      cursor: disabled ? 'not-allowed' : 'pointer',
-      ...(disabled ? rowLockedGreystyle : {}),
-    }}
-  >
-    <Icon name={icon} />
-  </Box>
-);
+}
 
 type ChoiceRowProps = {
   kind: 'radio' | 'checkbox';
@@ -402,14 +300,14 @@ type ChoiceRowProps = {
   tooltip?: string;
 };
 
-const ChoiceRow = ({
+function ChoiceRow({
   kind,
   selected,
   disabled,
   label,
   onClick,
   tooltip,
-}: ChoiceRowProps) => {
+}: ChoiceRowProps) {
   const indicatorIcon =
     kind === 'radio'
       ? selected
@@ -447,4 +345,4 @@ const ChoiceRow = ({
       {label}
     </Button>
   );
-};
+}

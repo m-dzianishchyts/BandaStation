@@ -15,11 +15,6 @@
 			result = tally_rating_poll(poll)
 		if(POLLTYPE_TEXT)
 			result = tally_text_poll(poll, include_admin_vote_data)
-		if(POLLTYPE_IRV)
-			result = list(
-				"type" = POLLTYPE_IRV,
-				"note" = "Этот тип опроса не поддерживается.",
-			)
 	if(include_admin_vote_data && result && (poll.poll_type == POLLTYPE_OPTION || poll.poll_type == POLLTYPE_MULTI || poll.poll_type == POLLTYPE_RATING))
 		result["respondent_ckeys"] = fetch_vote_respondent_ckeys(poll)
 	return result

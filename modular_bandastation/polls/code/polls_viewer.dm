@@ -9,7 +9,9 @@ GLOBAL_DATUM_INIT(polls_viewer, /datum/polls_viewer, new)
 	var/list/polls_ui_busy = list()
 
 /datum/polls_viewer/ui_state(mob/user)
-	return GLOB.always_state
+	if(check_rights_for(user.client, R_POLL))
+		return ADMIN_STATE(R_POLL)
+	return GLOB.new_player_state
 
 /datum/polls_viewer/ui_close(mob/user)
 	. = ..()

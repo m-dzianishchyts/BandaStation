@@ -1,5 +1,7 @@
 import type { PollType, SelectedPoll } from './types';
 
+const isString = (value: string | undefined): value is string => value !== undefined;
+
 /** Stored in PollDetails and passed further so the send action can get the payload for ui_act. */
 export type VoteDraft = {
   optionRef?: string;
@@ -41,19 +43,10 @@ export function makeInitialDraft(poll: SelectedPoll): VoteDraft {
       if (uv?.option_ids?.length) {
         const refs = uv.option_ids
           .map((id) => poll.options.find((o) => o.id === id)?.ref)
-          .filter(Boolean) as string[];
+          .filter(isString);
         return { optionRefs: refs };
       }
       return { optionRefs: [] };
-    }
-    case 'IRV': {
-      if (uv?.ranking?.length) {
-        const refs = uv.ranking
-          .map((id) => poll.options.find((o) => o.id === id)?.ref)
-          .filter(Boolean) as string[];
-        return { ranking: refs };
-      }
-      return { ranking: poll.options.map((o) => o.ref) };
     }
     case 'NUMVAL': {
       const ratings: Record<string, number> = {};
@@ -65,8 +58,9 @@ export function makeInitialDraft(poll: SelectedPoll): VoteDraft {
     }
     case 'TEXT':
       return { text: uv?.text ?? '' };
+    default:
+      return { optionRef: uv?.option_id ? poll.options.find((o) => o.id === uv.option_id)?.ref : undefined };
   }
-  return {};
 }
 
 /** Returns payload for ui_act if ready. */
@@ -83,7 +77,7 @@ export function buildVotePayload(
       }
       return { ready: true, payload: { option_ref: draft.optionRef } };
     case 'TEXT':
-      if (!draft.text || !draft.text.trim()) {
+      if (!draft.text?.trim()) {
         return { ready: false, reason: 'Введите текст ответа' };
       }
       return { ready: true, payload: { replytext: draft.text } };
@@ -95,16 +89,10 @@ export function buildVotePayload(
         ready: true,
         payload: { option_refs: draft.optionRefs },
       };
-    case 'IRV':
-      if (!draft.ranking || draft.ranking.length === 0) {
-        return { ready: false, reason: 'Нужно ранжировать варианты' };
-      }
-      return { ready: true, payload: { ranking: draft.ranking } };
     case 'NUMVAL':
       if (!draft.ratings || Object.keys(draft.ratings).length === 0) {
-        return { ready: false, reason: 'Оцените варианты' };
+        return { ready: false, reason: 'Выберите хотя бы одну оценку' };
       }
       return { ready: true, payload: { ratings: draft.ratings } };
   }
-  return { ready: false };
 }

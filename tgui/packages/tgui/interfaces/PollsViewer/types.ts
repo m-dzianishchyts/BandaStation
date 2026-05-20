@@ -1,6 +1,6 @@
 import type { BooleanLike } from 'tgui-core/react';
 
-export type PollType = 'OPTION' | 'TEXT' | 'NUMVAL' | 'MULTICHOICE' | 'IRV';
+export type PollType = 'OPTION' | 'TEXT' | 'NUMVAL' | 'MULTICHOICE';
 
 export type PollBrief = {
   id: number;
@@ -9,7 +9,7 @@ export type PollBrief = {
   subtitle: string | null;
   poll_type: PollType;
   start_datetime: string | null;
-  end_datetime: string;
+  end_datetime: string | null;
   voted: BooleanLike;
   allow_revoting: BooleanLike;
   admin_only: BooleanLike;
@@ -24,9 +24,9 @@ export type PollOption = {
   text: string;
   min_val: number | null;
   max_val: number | null;
-  desc_min: string;
-  desc_mid: string;
-  desc_max: string;
+  desc_min: string | null;
+  desc_mid: string | null;
+  desc_max: string | null;
 };
 
 export type UserVotes = {
@@ -53,9 +53,9 @@ export type RatingOptionResult = {
   text: string;
   min_val: number;
   max_val: number;
-  desc_min: string;
-  desc_mid: string;
-  desc_max: string;
+  desc_min: string | null;
+  desc_mid: string | null;
+  desc_max: string | null;
   distribution: RatingDistribution[];
   total_voters: number;
   average: number;
@@ -67,15 +67,37 @@ export type TextReply = {
   datetime: string;
 };
 
-export type PollResults = {
-  type: PollType;
-  total_voters?: number;
-  total_votes_sum?: number;
-  options?: OptionResult[] | RatingOptionResult[];
-  replies?: TextReply[];
+export type OptionPollResults = {
+  type: 'OPTION';
+  total_voters: number;
+  options: OptionResult[];
   respondent_ckeys?: string[];
-  note?: string;
 };
+
+export type MultiChoicePollResults = {
+  type: 'MULTICHOICE';
+  total_voters: number;
+  total_votes_sum: number;
+  options: OptionResult[];
+  respondent_ckeys?: string[];
+};
+
+export type RatingPollResults = {
+  type: 'NUMVAL';
+  options: RatingOptionResult[];
+  respondent_ckeys?: string[];
+};
+
+export type TextPollResults = {
+  type: 'TEXT';
+  replies: TextReply[];
+};
+
+export type PollResults =
+  | OptionPollResults
+  | MultiChoicePollResults
+  | RatingPollResults
+  | TextPollResults;
 
 export type SelectedPoll = {
   id: number;
@@ -85,7 +107,7 @@ export type SelectedPoll = {
   created_by?: string | null;
   poll_type: PollType;
   start_datetime: string | null;
-  end_datetime: string;
+  end_datetime: string | null;
   future_poll?: BooleanLike;
   allow_revoting: BooleanLike;
   dont_show: BooleanLike;
@@ -99,10 +121,10 @@ export type SelectedPoll = {
 };
 
 export type Data = {
-  polls: PollBrief[];
-  is_pollster: BooleanLike;
-  ckey: string;
-  selected_poll: SelectedPoll | null;
+  polls?: PollBrief[];
+  is_pollster?: BooleanLike;
+  ckey?: string | null;
+  selected_poll?: SelectedPoll | null;
   // Server side lock while poll UI runs a DB update
   ui_busy?: BooleanLike;
 };

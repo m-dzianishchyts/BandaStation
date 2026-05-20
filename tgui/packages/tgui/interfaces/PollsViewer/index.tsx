@@ -1,5 +1,4 @@
-import type { CSSProperties } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Box, Button, Icon, Section, Stack, Tabs } from 'tgui-core/components';
 
 import { useBackend } from '../../backend';
@@ -12,46 +11,68 @@ import {
   buildVotePayload,
   isVoteSubmitBlocked,
   makeInitialDraft,
-  type VoteDraft,
 } from './voteDraft';
+
+function formatPollTimestamp(value: string | null | undefined) {
+	if (!value) {
+		return 'не указано';
+	}
+	return new Date(`${value} UTC`).toLocaleString([], {
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+		hour: '2-digit',
+		minute: '2-digit',
+	});
+}
 
 type TabId = 'vote' | 'results';
 
-const uiLockedGreystyle: CSSProperties = {
+const uiLockedGreystyle = {
   opacity: 0.52,
   filter: 'grayscale(0.38)',
-  pointerEvents: 'none',
-  cursor: 'not-allowed',
-};
+} as const;
 
-export const PollsViewer = () => {
-  const { data } = useBackend<Data>();
-  const { selected_poll } = data;
+export function PollsViewer() {
+  const { act, data } = useBackend<Data>();
+  const selected_poll = data.selected_poll ?? null;
   const [listCollapsed, setListCollapsed] = useState(false);
-  // pendingRef - poll being clicked but no response yet
   const [pendingRef, setPendingRef] = useState<string | null>(null);
+  const [pendingSelectionWasBusy, setPendingSelectionWasBusy] = useState(false);
 
-  // change loading indicator when backend sent data
   useEffect(() => {
-    if (!selected_poll || !pendingRef) return;
+    if (!pendingRef) return;
+    if (!selected_poll) return;
     if (selected_poll.ref === pendingRef) {
       setPendingRef(null);
+      setPendingSelectionWasBusy(false);
       return;
     }
-    // Keep pending until id matches
     if (
       pendingRef.startsWith('archived:') &&
       Number(pendingRef.slice('archived:'.length)) === selected_poll.id
     ) {
       setPendingRef(null);
+      setPendingSelectionWasBusy(false);
     }
-  }, [selected_poll, pendingRef]);
+  }, [selected_poll?.id, selected_poll?.ref, pendingRef]);
 
-  const activeRef = selected_poll?.ref ?? pendingRef ?? undefined;
-  const awaitingSelectionDetail = Boolean(
-    pendingRef !== null && (!selected_poll || selected_poll.ref !== pendingRef),
-  );
-  const interactionLocked = awaitingSelectionDetail || Boolean(data.ui_busy);
+  useEffect(() => {
+    if (!pendingRef) return;
+    if (data.ui_busy) {
+      setPendingSelectionWasBusy(true);
+      return;
+    }
+    if (pendingSelectionWasBusy && !selected_poll) {
+      setPendingRef(null);
+      setPendingSelectionWasBusy(false);
+    }
+  }, [data.ui_busy, selected_poll, pendingRef, pendingSelectionWasBusy]);
+
+  const activeRef = pendingRef ?? selected_poll?.ref ?? undefined;
+  const backendBusy = Boolean(data.ui_busy);
+  const selectionLocked = backendBusy || pendingRef !== null;
+  const interactionLocked = backendBusy;
 
   return (
     <Window title="Опросы" width={1024} height={680}>
@@ -65,9 +86,13 @@ export const PollsViewer = () => {
             >
               <PollList
                 selectedRef={activeRef}
-                interactionLocked={interactionLocked}
-                onSelect={(ref) => setPendingRef(ref)}
+                interactionLocked={selectionLocked}
+                onSelect={(ref) => {
+                  setPendingRef(ref);
+                  setPendingSelectionWasBusy(false);
+                }}
                 onCollapse={() => setListCollapsed(true)}
+                onOpenPollManagement={() => act('open_poll_list_panel')}
               />
             </Stack.Item>
           )}
@@ -95,7 +120,7 @@ export const PollsViewer = () => {
   );
 };
 
-const RightPane = ({
+function RightPane({
   selected,
   pendingRef,
   interactionLocked,
@@ -103,7 +128,7 @@ const RightPane = ({
   selected: SelectedPoll | null;
   pendingRef: string | null;
   interactionLocked: boolean;
-}) => {
+}) {
   if (pendingRef && (!selected || selected.ref !== pendingRef)) {
     return <LoadingState />;
   }
@@ -119,41 +144,45 @@ const RightPane = ({
   return <EmptyState />;
 };
 
-const EmptyState = () => (
-  <Section fill>
-    <Stack fill vertical align="center" justify="center">
-      <Stack.Item>
-        <Icon name="square-poll-vertical" size={4} color="label" />
-      </Stack.Item>
-      <Stack.Item>
-        <Box color="label" fontSize={1.2}>
-          Выберите опрос слева, чтобы увидеть детали.
-        </Box>
-      </Stack.Item>
-    </Stack>
-  </Section>
-);
+function EmptyState() {
+  return (
+    <Section fill>
+      <Stack fill vertical align="center" justify="center">
+        <Stack.Item>
+          <Icon name="square-poll-vertical" size={4} color="label" />
+        </Stack.Item>
+        <Stack.Item>
+          <Box color="label" fontSize={1.2}>
+            Выберите опрос слева, чтобы увидеть детали.
+          </Box>
+        </Stack.Item>
+      </Stack>
+    </Section>
+  );
+}
 
-const LoadingState = () => (
-  <Section fill>
-    <Stack fill vertical align="center" justify="center">
-      <Stack.Item>
-        <Icon name="spinner" spin size={3} color="label" />
-      </Stack.Item>
-      <Stack.Item>
-        <Box color="label">Загрузка опроса...</Box>
-      </Stack.Item>
-    </Stack>
-  </Section>
-);
+function LoadingState() {
+  return (
+    <Section fill>
+      <Stack fill vertical align="center" justify="center">
+        <Stack.Item>
+          <Icon name="spinner" spin size={3} color="label" />
+        </Stack.Item>
+        <Stack.Item>
+          <Box color="label">Загрузка опроса...</Box>
+        </Stack.Item>
+      </Stack>
+    </Section>
+  );
+}
 
-const PollDetails = ({
+function PollDetails({
   poll,
   interactionLocked,
 }: {
   poll: SelectedPoll;
   interactionLocked: boolean;
-}) => {
+}) {
   const { act, data } = useBackend<Data>();
   const isPollster = !!data.is_pollster;
   const canVote = !poll.finished && !poll.future_poll;
@@ -161,18 +190,13 @@ const PollDetails = ({
     canVote ? 'vote' : 'results',
   );
 
-  // useRef so we can skip initial draft creation on each call
-  const initialDraftRef = useRef<VoteDraft | null>(null);
-  if (initialDraftRef.current === null) {
-    initialDraftRef.current = makeInitialDraft(poll);
-  }
-  const [draft, setDraft] = useState<VoteDraft>(initialDraftRef.current);
+  const [draft, setDraft] = useState(() => makeInitialDraft(poll));
   const [confirmingText, setConfirmingText] = useState(false);
 
   const submitCheck = buildVotePayload(poll.poll_type, draft);
   const ballotLockedNoRevote = isVoteSubmitBlocked(poll);
 
-  const doSubmit = () => {
+  function doSubmit() {
     if (
       ballotLockedNoRevote ||
       !submitCheck.ready ||
@@ -182,9 +206,9 @@ const PollDetails = ({
       return;
     act('vote', { poll_ref: poll.ref, ...submitCheck.payload });
     setConfirmingText(false);
-  };
+  }
 
-  const handleSubmitClick = () => {
+  function handleSubmitClick() {
     if (
       ballotLockedNoRevote ||
       !submitCheck.ready ||
@@ -196,7 +220,7 @@ const PollDetails = ({
       return;
     }
     doSubmit();
-  };
+  }
 
   return (
     <Stack fill vertical>
@@ -224,7 +248,7 @@ const PollDetails = ({
                     <Box color="average">
                       <Icon name="hourglass-start" />{' '}
                       {poll.start_datetime
-                        ? `Старт: ${poll.start_datetime}`
+                        ? `Старт: ${formatPollTimestamp(poll.start_datetime)}`
                         : 'Ещё не начался'}
                     </Box>
                   ) : (
@@ -358,4 +382,4 @@ const PollDetails = ({
       )}
     </Stack>
   );
-};
+}

@@ -12,11 +12,15 @@ import {
 import { useBackend } from '../../backend';
 import type {
   Data,
+  MultiChoicePollResults,
   OptionResult,
+  OptionPollResults,
   PollResults,
+  RatingPollResults,
   RatingOptionResult,
   SelectedPoll,
   TextReply,
+  TextPollResults,
 } from './types';
 
 type Props = {
@@ -24,7 +28,7 @@ type Props = {
   isPollster: boolean;
 };
 
-export const ResultsTab = ({ poll, isPollster }: Props) => {
+export function ResultsTab({ poll, isPollster }: Props) {
   if (!poll.can_view_results) {
     return (
       <NoticeBox>
@@ -44,9 +48,9 @@ export const ResultsTab = ({ poll, isPollster }: Props) => {
       isPollster={isPollster}
     />
   );
-};
+}
 
-const ResultsContent = ({
+function ResultsContent({
   pollRef,
   results,
   isPollster,
@@ -54,11 +58,10 @@ const ResultsContent = ({
   pollRef: string;
   results: PollResults;
   isPollster: boolean;
-}) => {
+}) {
   switch (results.type) {
     case 'OPTION':
     case 'MULTICHOICE':
-    case 'IRV':
       return (
         <OptionResults
           pollRef={pollRef}
@@ -85,15 +88,15 @@ const ResultsContent = ({
     default:
       return <NoticeBox danger>Неизвестный тип опроса.</NoticeBox>;
   }
-};
+}
 
-const RespondentAdminPanel = ({
+function RespondentAdminPanel({
   pollRef,
   ckeys,
 }: {
   pollRef: string;
   ckeys: string[];
-}) => {
+}) {
   const { act } = useBackend<Data>();
   if (!ckeys.length) return null;
 
@@ -128,33 +131,27 @@ const RespondentAdminPanel = ({
       </Stack>
     </Section>
   );
-};
+}
 
-const OptionResults = ({
+function OptionResults({
   pollRef,
   results,
   isPollster,
 }: {
   pollRef: string;
-  results: PollResults;
+  results: OptionPollResults | MultiChoicePollResults;
   isPollster: boolean;
-}) => {
-  const options = (results.options ?? []) as OptionResult[];
-  const totalVoters = results.total_voters ?? 0;
-  // For MULTI, normalize by the total sum of votes so options can be compared against each other
+}) {
+  const options: OptionResult[] = results.options;
+  const totalVoters = results.total_voters;
   const denominator =
     results.type === 'MULTICHOICE'
-      ? (results.total_votes_sum ?? 0) || 1
+      ? results.total_votes_sum || 1
       : totalVoters || 1;
   const winner = options.length > 0 ? options[0] : null;
 
   return (
     <Stack vertical>
-      {results.note && (
-        <Stack.Item>
-          <NoticeBox info>{results.note}</NoticeBox>
-        </Stack.Item>
-      )}
       {winner && winner.votes > 0 && (
         <Stack.Item>
           <NoticeBox success>
@@ -211,18 +208,18 @@ const OptionResults = ({
       </Stack.Item>
     </Stack>
   );
-};
+}
 
-const RatingResults = ({
+function RatingResults({
   pollRef,
   results,
   isPollster,
 }: {
   pollRef: string;
-  results: PollResults;
+  results: RatingPollResults;
   isPollster: boolean;
-}) => {
-  const options = (results.options ?? []) as RatingOptionResult[];
+}) {
+  const options: RatingOptionResult[] = results.options;
 
   const respondKeys = results.respondent_ckeys ?? [];
 
@@ -275,18 +272,18 @@ const RatingResults = ({
       </Stack.Item>
     </Stack>
   );
-};
+}
 
-const TextResults = ({
+function TextResults({
   pollRef,
   results,
   isPollster,
 }: {
   pollRef: string;
-  results: PollResults;
+  results: TextPollResults;
   isPollster: boolean;
-}) => {
-  const replies = results.replies ?? [];
+}) {
+  const replies = results.replies;
 
   if (replies.length === 0) {
     return <NoticeBox>Ответов пока нет.</NoticeBox>;
@@ -311,9 +308,9 @@ const TextResults = ({
       </Stack>
     </Section>
   );
-};
+}
 
-const ReplyCard = ({
+function ReplyCard({
   reply,
   isPollster,
   pollRef,
@@ -321,14 +318,14 @@ const ReplyCard = ({
   reply: TextReply;
   isPollster: boolean;
   pollRef: string;
-}) => {
+}) {
   const { act } = useBackend<Data>();
   const showDelete =
     !!isPollster && reply.id !== undefined && reply.id !== null;
 
   return (
     <Section>
-      <Stack align="baseline" justify="space-between" gap={1} mb={0.5}>
+      <Stack align="baseline" justify="space-between" g={1} mb={0.5}>
         <Stack.Item grow>
           <Box color="label">
             <Icon name="clock" /> {reply.datetime}
@@ -358,4 +355,4 @@ const ReplyCard = ({
       </Box>
     </Section>
   );
-};
+}
